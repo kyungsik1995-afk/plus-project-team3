@@ -1,4 +1,4 @@
-package com.example.plus.config.jwt;
+package com.example.plus.global.security.jwt;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
