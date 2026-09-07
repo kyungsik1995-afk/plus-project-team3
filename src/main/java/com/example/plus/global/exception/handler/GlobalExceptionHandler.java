@@ -3,7 +3,7 @@ package com.example.plus.global.exception.handler;
 import com.example.plus.global.common.response.ApiResponse;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.ErrorResponse;
-import com.example.plus.global.exception.custom.CustomException;
+import com.example.plus.global.exception.business.BusinessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(CustomException.class)
-    public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e) {
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
 
         ErrorCode errorCode = e.getErrorCode();
 
