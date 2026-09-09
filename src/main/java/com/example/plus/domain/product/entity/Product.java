@@ -38,4 +38,24 @@ public class Product extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    public void update(
+            String name,
+            ProductCategory category,
+            Long price,
+            String description
+    ) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (category != null) {
+            this.category = category;
+        }
+        if (price != null) {
+            this.price = price;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+    }
 }
