@@ -1,6 +1,7 @@
 package com.example.plus.domain.product.service;
 
 import com.example.plus.domain.product.dto.ProductDetailResponse;
+import com.example.plus.domain.product.dto.ProductUpdateRequest;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
@@ -19,6 +20,21 @@ public class ProductService {
     public ProductDetailResponse getProductDetail(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        return ProductDetailResponse.from(product);
+    }
+
+    @Transactional
+    public ProductDetailResponse updateProduct(Long productId, ProductUpdateRequest request) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        product.update(
+                request.name(),
+                request.category(),
+                request.price(),
+                request.description()
+        );
 
         return ProductDetailResponse.from(product);
     }
