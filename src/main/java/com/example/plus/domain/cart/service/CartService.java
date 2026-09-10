@@ -1,0 +1,58 @@
+package com.example.plus.domain.cart.service;
+
+import com.example.plus.domain.cart.dto.CartAddRequest;
+import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.entity.Cart;
+import com.example.plus.domain.cart.entity.CartItem;
+import com.example.plus.domain.cart.repository.CartItemRepository;
+import com.example.plus.domain.cart.repository.CartRepository;
+import com.example.plus.domain.product.entity.Product;
+import com.example.plus.domain.product.repository.ProductRepository;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class CartService {
+
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final ProductRepository productRepository;
+
+    @Transactional
+    public CartItemResponse addItem(Long memberId, CartAddRequest request) {
+        Cart cart = cartRepository.findByMemberId(memberId)
+                .orElseGet(() -> cartRepository.save(Cart.create(memberId)));
+
+        Product product = productRepository.findById(request.productId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        CartItem cartItem = cartItemRepository.findByCartAndProduct(cart, product)
+                .map(existingItem -> addToExistingItem(existingItem, request.quantity(), product))
+                .orElseGet(() -> createNewItem(cart, product, request.quantity()));
+
+        return CartItemResponse.from(cartItem);
+    }
+
+    private CartItem addToExistingItem(CartItem cartItem, Integer quantity, Product product) {
+        int finalQuantity = cartItem.getQuantity() + quantity;
+        validateStock(product, finalQuantity);
+        cartItem.addQuantity(quantity);
+        return cartItem;
+    }
+
+    private CartItem createNewItem(Cart cart, Product product, Integer quantity) {
+        validateStock(product, quantity);
+        return cartItemRepository.save(CartItem.create(cart, product, quantity));
+    }
+
+    private void validateStock(Product product, Integer quantity) {
+        if (quantity > product.getStockQuantity()) {
+            throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+        }
+    }
+}
