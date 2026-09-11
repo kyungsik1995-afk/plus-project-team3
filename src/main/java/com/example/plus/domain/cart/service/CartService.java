@@ -2,6 +2,7 @@ package com.example.plus.domain.cart.service;
 
 import com.example.plus.domain.cart.dto.CartAddRequest;
 import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartResponse;
 import com.example.plus.domain.cart.entity.Cart;
 import com.example.plus.domain.cart.entity.CartItem;
 import com.example.plus.domain.cart.repository.CartItemRepository;
@@ -10,6 +11,7 @@ import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,12 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
+
+    public CartResponse getCart(Long memberId) {
+        return cartRepository.findByMemberId(memberId)
+                .map(this::createCartResponse)
+                .orElseGet(() -> new CartResponse(List.of(), 0L));
+    }
 
     @Transactional
     public CartItemResponse addItem(Long memberId, CartAddRequest request) {
@@ -36,6 +44,18 @@ public class CartService {
                 .orElseGet(() -> createNewItem(cart, product, request.quantity()));
 
         return CartItemResponse.from(cartItem);
+    }
+
+    private CartResponse createCartResponse(Cart cart) {
+        List<CartItemResponse> items = cartItemRepository.findAllByCart(cart).stream()
+                .map(CartItemResponse::from)
+                .toList();
+
+        long totalPrice = items.stream()
+                .mapToLong(CartItemResponse::itemTotalPrice)
+                .sum();
+
+        return new CartResponse(items, totalPrice);
     }
 
     private CartItem addToExistingItem(CartItem cartItem, Integer quantity, Product product) {
