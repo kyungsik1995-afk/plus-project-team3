@@ -123,6 +123,78 @@ class CartServiceTest {
     }
 
     @Test
+    void deleteItemDeletesOwnedCartItem() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.deleteItem(MEMBER_ID, 100L);
+
+        verify(cartItemRepository).delete(cartItem);
+    }
+
+    @Test
+    void deleteItemRejectsMissingCartItem() {
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.deleteItem(MEMBER_ID, 100L)
+        );
+
+        assertEquals(ErrorCode.CART_ITEM_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void deleteItemRejectsAnotherMembersItem() {
+        Cart anotherMembersCart = Cart.create(2L);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.deleteItem(MEMBER_ID, 100L)
+        );
+
+        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+    }
+
+    @Test
+    void deleteItemDoesNotDeleteAnotherMembersItem() {
+        Cart anotherMembersCart = Cart.create(2L);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        assertThrows(
+                BusinessException.class,
+                () -> cartService.deleteItem(MEMBER_ID, 100L)
+        );
+
+        verify(cartItemRepository, never()).delete(any(CartItem.class));
+    }
+
+    @Test
+    void deleteItemDoesNotChangeProductStock() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.deleteItem(MEMBER_ID, 100L);
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
     void updateItemQuantityChangesToRequestedFinalQuantity() {
         Cart cart = Cart.create(MEMBER_ID);
         Product product = productForSuccess(10);
