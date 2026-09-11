@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.plus.domain.cart.dto.CartAddRequest;
 import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartItemUpdateRequest;
 import com.example.plus.domain.cart.dto.CartResponse;
 import com.example.plus.domain.cart.entity.Cart;
 import com.example.plus.domain.cart.entity.CartItem;
@@ -119,6 +120,138 @@ class CartServiceTest {
         assertEquals("테스트 상품", itemResponse.productName());
         assertEquals(10_000L, itemResponse.productPrice());
         assertEquals(3, itemResponse.quantity());
+    }
+
+    @Test
+    void updateItemQuantityChangesToRequestedFinalQuantity() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        CartItemResponse response = cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(5)
+        );
+
+        assertEquals(5, cartItem.getQuantity());
+        assertEquals(5, response.quantity());
+        assertEquals(5_000L, response.itemTotalPrice());
+        verify(cartItemRepository, never()).save(any(CartItem.class));
+    }
+
+    @Test
+    void updateItemQuantityDoesNotAddRequestedQuantity() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(5)
+        );
+
+        assertEquals(5, cartItem.getQuantity());
+    }
+
+    @Test
+    void updateItemQuantityAllowsQuantityEqualToStock() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        CartItemResponse response = cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(10)
+        );
+
+        assertEquals(10, cartItem.getQuantity());
+        assertEquals(10, response.quantity());
+    }
+
+    @Test
+    void updateItemQuantityRejectsQuantityOverStockWithoutChangingItem() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.updateItemQuantity(
+                        MEMBER_ID,
+                        100L,
+                        new CartItemUpdateRequest(11)
+                )
+        );
+
+        assertEquals(ErrorCode.OUT_OF_STOCK, exception.getErrorCode());
+        assertEquals(3, cartItem.getQuantity());
+    }
+
+    @Test
+    void updateItemQuantityRejectsMissingCartItem() {
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.updateItemQuantity(
+                        MEMBER_ID,
+                        100L,
+                        new CartItemUpdateRequest(5)
+                )
+        );
+
+        assertEquals(ErrorCode.CART_ITEM_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void updateItemQuantityRejectsAnotherMembersItemWithoutChangingQuantity() {
+        Cart anotherMembersCart = Cart.create(2L);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.updateItemQuantity(
+                        MEMBER_ID,
+                        100L,
+                        new CartItemUpdateRequest(5)
+                )
+        );
+
+        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+        assertEquals(3, cartItem.getQuantity());
+    }
+
+    @Test
+    void updateItemQuantityDoesNotChangeProductStock() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(5)
+        );
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verifyNoInteractions(productRepository);
     }
 
     @Test
