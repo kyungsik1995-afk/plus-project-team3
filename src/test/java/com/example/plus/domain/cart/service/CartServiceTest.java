@@ -123,6 +123,80 @@ class CartServiceTest {
     }
 
     @Test
+    void clearCartDeletesAllItemsWhenMultipleItemsExist() {
+        Cart cart = Cart.create(MEMBER_ID);
+        CartItem firstItem = CartItem.create(
+                cart,
+                org.mockito.Mockito.mock(Product.class),
+                2
+        );
+        CartItem secondItem = CartItem.create(
+                cart,
+                org.mockito.Mockito.mock(Product.class),
+                3
+        );
+        List<CartItem> cartItems = List.of(firstItem, secondItem);
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(cartItems);
+
+        cartService.clearCart(MEMBER_ID);
+
+        verify(cartItemRepository).deleteAll(cartItems);
+    }
+
+    @Test
+    void clearCartCompletesWhenCartHasNoItems() {
+        Cart cart = Cart.create(MEMBER_ID);
+        List<CartItem> emptyItems = List.of();
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(emptyItems);
+
+        cartService.clearCart(MEMBER_ID);
+
+        verify(cartItemRepository).deleteAll(emptyItems);
+    }
+
+    @Test
+    void clearCartCompletesWhenCartDoesNotExist() {
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+
+        cartService.clearCart(MEMBER_ID);
+
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void clearCartDoesNotDeleteCartEntity() {
+        Cart cart = Cart.create(MEMBER_ID);
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of());
+
+        cartService.clearCart(MEMBER_ID);
+
+        verify(cartRepository, never()).delete(any(Cart.class));
+    }
+
+    @Test
+    void clearCartDoesNotChangeProductStock() {
+        Cart cart = Cart.create(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+        List<CartItem> cartItems = List.of(cartItem);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(cartItems);
+
+        cartService.clearCart(MEMBER_ID);
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
     void deleteItemDeletesOwnedCartItem() {
         Cart cart = Cart.create(MEMBER_ID);
         Product product = org.mockito.Mockito.mock(Product.class);
