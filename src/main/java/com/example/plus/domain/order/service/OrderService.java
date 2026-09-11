@@ -1,8 +1,11 @@
 package com.example.plus.domain.order.service;
 
+import com.example.plus.domain.member.entity.Member;
 import com.example.plus.domain.order.dto.OrderItemResponse;
 import com.example.plus.domain.order.dto.OrderResponse;
 import com.example.plus.domain.order.entity.Order;
+import com.example.plus.domain.order.entity.OrderItem;
+import com.example.plus.domain.order.entity.OrderStatus;
 import com.example.plus.domain.order.repository.OrderRepository;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +22,32 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+
+    /**
+     * 주문을 생성하고 저장한다.
+     *
+     * 전달받은 주문 상품을 Order에 연결한 뒤 하나의 주문으로 저장한다.
+     * Order의 Cascade 설정에 의해 OrderItem도 함께 저장된다.
+     */
+    @Transactional
+    public Order createOrder(
+            Member member,
+            List<OrderItem> orderItems,
+            Long totalAmount
+    ) {
+        String orderNumber = "ORD-" + UUID.randomUUID();
+
+        Order order = new Order(
+                member,
+                orderNumber,
+                totalAmount,
+                OrderStatus.PAYMENT_PENDING
+        );
+
+        orderItems.forEach(order::addOrderItem);
+
+        return orderRepository.save(order);
+    }
 
     // 내 주문 목록 조회
     public List<Order> findOrderEntities(Long memberId) {
