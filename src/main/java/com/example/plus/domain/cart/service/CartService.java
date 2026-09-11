@@ -2,6 +2,7 @@ package com.example.plus.domain.cart.service;
 
 import com.example.plus.domain.cart.dto.CartAddRequest;
 import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartItemUpdateRequest;
 import com.example.plus.domain.cart.dto.CartResponse;
 import com.example.plus.domain.cart.entity.Cart;
 import com.example.plus.domain.cart.entity.CartItem;
@@ -12,6 +13,7 @@ import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,22 @@ public class CartService {
         return cartRepository.findByMemberId(memberId)
                 .map(this::createCartResponse)
                 .orElseGet(() -> new CartResponse(List.of(), 0L));
+    }
+
+    @Transactional
+    public CartItemResponse updateItemQuantity(
+            Long memberId,
+            Long cartItemId,
+            CartItemUpdateRequest request
+    ) {
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
+
+        validateOwnership(memberId, cartItem);
+        validateStock(cartItem.getProduct(), request.quantity());
+        cartItem.changeQuantity(request.quantity());
+
+        return CartItemResponse.from(cartItem);
     }
 
     @Transactional
@@ -56,6 +74,12 @@ public class CartService {
                 .sum();
 
         return new CartResponse(items, totalPrice);
+    }
+
+    private void validateOwnership(Long memberId, CartItem cartItem) {
+        if (!Objects.equals(memberId, cartItem.getCart().getMemberId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
     }
 
     private CartItem addToExistingItem(CartItem cartItem, Integer quantity, Product product) {
