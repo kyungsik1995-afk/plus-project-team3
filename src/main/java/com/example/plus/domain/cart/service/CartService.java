@@ -34,6 +34,14 @@ public class CartService {
     }
 
     @Transactional
+    public void clearCart(Long memberId) {
+        cartRepository.findByMemberId(memberId)
+                .ifPresent(cart -> cartItemRepository.deleteAll(
+                        cartItemRepository.findAllByCart(cart)
+                ));
+    }
+
+    @Transactional
     public void deleteItem(Long memberId, Long cartItemId) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
