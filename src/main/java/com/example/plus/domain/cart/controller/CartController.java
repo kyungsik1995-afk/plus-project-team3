@@ -11,6 +11,7 @@ import com.example.plus.global.exception.business.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +33,14 @@ public class CartController {
     @GetMapping
     public ApiResponse<CartResponse> getCart() {
         return ApiResponse.success(cartService.getCart(TEMP_MEMBER_ID));
+    }
+
+    @DeleteMapping("/items/{cartItemId}")
+    public ApiResponse<Void> deleteItem(
+            @PathVariable("cartItemId") Long cartItemId
+    ) {
+        cartService.deleteItem(TEMP_MEMBER_ID, cartItemId);
+        return ApiResponse.ok();
     }
 
     @PatchMapping("/items/{cartItemId}")
