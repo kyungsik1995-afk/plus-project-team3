@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.plus.domain.cart.dto.CartAddRequest;
 import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartResponse;
 import com.example.plus.domain.cart.entity.Cart;
 import com.example.plus.domain.cart.entity.CartItem;
 import com.example.plus.domain.cart.repository.CartItemRepository;
@@ -18,6 +19,7 @@ import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +44,82 @@ class CartServiceTest {
 
     @InjectMocks
     private CartService cartService;
+
+    @Test
+    void getCartReturnsEmptyResponseWhenCartDoesNotExist() {
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(List.of(), response.items());
+        assertEquals(0L, response.totalPrice());
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void getCartReturnsEmptyResponseWhenCartHasNoItems() {
+        Cart cart = Cart.create(MEMBER_ID);
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of());
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(List.of(), response.items());
+        assertEquals(0L, response.totalPrice());
+    }
+
+    @Test
+    void getCartCalculatesSingleItemTotalPrice() {
+        Cart cart = Cart.create(MEMBER_ID);
+        CartItem cartItem = cartItemForResponse(100L, PRODUCT_ID, "상품 A", 10_000L, 3);
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of(cartItem));
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(30_000L, response.items().get(0).itemTotalPrice());
+        assertEquals(30_000L, response.totalPrice());
+    }
+
+    @Test
+    void getCartSumsMultipleItemTotalPrices() {
+        Cart cart = Cart.create(MEMBER_ID);
+        CartItem firstItem = cartItemForResponse(100L, 10L, "상품 A", 10_000L, 2);
+        CartItem secondItem = cartItemForResponse(200L, 20L, "상품 B", 30_000L, 3);
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of(firstItem, secondItem));
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(2, response.items().size());
+        assertEquals(110_000L, response.totalPrice());
+    }
+
+    @Test
+    void getCartIncludesCartItemAndProductInformation() {
+        Cart cart = Cart.create(MEMBER_ID);
+        CartItem cartItem = cartItemForResponse(
+                100L,
+                PRODUCT_ID,
+                "테스트 상품",
+                10_000L,
+                3
+        );
+
+        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of(cartItem));
+
+        CartItemResponse itemResponse = cartService.getCart(MEMBER_ID).items().get(0);
+
+        assertEquals(100L, itemResponse.cartItemId());
+        assertEquals(PRODUCT_ID, itemResponse.productId());
+        assertEquals("테스트 상품", itemResponse.productName());
+        assertEquals(10_000L, itemResponse.productPrice());
+        assertEquals(3, itemResponse.quantity());
+    }
 
     @Test
     void addItemCreatesCartAndNewCartItem() {
@@ -180,5 +258,24 @@ class CartServiceTest {
         Product product = org.mockito.Mockito.mock(Product.class);
         when(product.getStockQuantity()).thenReturn(stockQuantity);
         return product;
+    }
+
+    private CartItem cartItemForResponse(
+            Long cartItemId,
+            Long productId,
+            String productName,
+            Long productPrice,
+            Integer quantity
+    ) {
+        Product product = org.mockito.Mockito.mock(Product.class);
+        when(product.getId()).thenReturn(productId);
+        when(product.getName()).thenReturn(productName);
+        when(product.getPrice()).thenReturn(productPrice);
+
+        CartItem cartItem = org.mockito.Mockito.mock(CartItem.class);
+        when(cartItem.getId()).thenReturn(cartItemId);
+        when(cartItem.getProduct()).thenReturn(product);
+        when(cartItem.getQuantity()).thenReturn(quantity);
+        return cartItem;
     }
 }
