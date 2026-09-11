@@ -2,6 +2,7 @@ package com.example.plus.domain.cart.controller;
 
 import com.example.plus.domain.cart.dto.CartAddRequest;
 import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartResponse;
 import com.example.plus.domain.cart.service.CartService;
 import com.example.plus.global.common.response.ApiResponse;
 import com.example.plus.global.exception.ErrorCode;
@@ -9,6 +10,7 @@ import com.example.plus.global.exception.business.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +25,11 @@ public class CartController {
     private static final Long TEMP_MEMBER_ID = 1L;
 
     private final CartService cartService;
+
+    @GetMapping
+    public ApiResponse<CartResponse> getCart() {
+        return ApiResponse.success(cartService.getCart(TEMP_MEMBER_ID));
+    }
 
     @PostMapping("/items")
     public ApiResponse<CartItemResponse> addItem(
