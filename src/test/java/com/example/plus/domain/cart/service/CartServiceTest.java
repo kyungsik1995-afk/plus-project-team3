@@ -62,7 +62,7 @@ class CartServiceTest {
         Cart cart = Cart.create(MEMBER_ID);
 
         when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of());
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of());
 
         CartResponse response = cartService.getCart(MEMBER_ID);
 
@@ -76,7 +76,7 @@ class CartServiceTest {
         CartItem cartItem = cartItemForResponse(100L, PRODUCT_ID, "상품 A", 10_000L, 3);
 
         when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of(cartItem));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of(cartItem));
 
         CartResponse response = cartService.getCart(MEMBER_ID);
 
@@ -91,7 +91,8 @@ class CartServiceTest {
         CartItem secondItem = cartItemForResponse(200L, 20L, "상품 B", 30_000L, 3);
 
         when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of(firstItem, secondItem));
+        when(cartItemRepository.findAllByCartWithProduct(cart))
+                .thenReturn(List.of(firstItem, secondItem));
 
         CartResponse response = cartService.getCart(MEMBER_ID);
 
@@ -111,7 +112,7 @@ class CartServiceTest {
         );
 
         when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of(cartItem));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of(cartItem));
 
         CartItemResponse itemResponse = cartService.getCart(MEMBER_ID).items().get(0);
 
@@ -120,6 +121,7 @@ class CartServiceTest {
         assertEquals("테스트 상품", itemResponse.productName());
         assertEquals(10_000L, itemResponse.productPrice());
         assertEquals(3, itemResponse.quantity());
+        verify(cartItemRepository).findAllByCartWithProduct(cart);
     }
 
     @Test
