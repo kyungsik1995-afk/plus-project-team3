@@ -11,6 +11,7 @@ import com.example.plus.global.exception.business.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,27 +28,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CartController {
 
-    // TODO(authentication): Replace this with the member ID supplied by the authenticated Principal.
-    private static final Long TEMP_MEMBER_ID = 1L;
-
     private final CartService cartService;
 
     @GetMapping
-    public ApiResponse<CartResponse> getCart() {
-        return ApiResponse.success(cartService.getCart(TEMP_MEMBER_ID));
+    public ApiResponse<CartResponse> getCart(
+            @AuthenticationPrincipal Long memberId
+    ) {
+        return ApiResponse.success(cartService.getCart(memberId));
     }
 
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void clearCart() {
-        cartService.clearCart(TEMP_MEMBER_ID);
+    public void clearCart(
+            @AuthenticationPrincipal Long memberId
+    ) {
+        cartService.clearCart(memberId);
     }
 
     @DeleteMapping("/items/{cartItemId}")
     public ApiResponse<Void> deleteItem(
-            @PathVariable("cartItemId") Long cartItemId
+            @PathVariable("cartItemId") Long cartItemId,
+            @AuthenticationPrincipal Long memberId
     ) {
-        cartService.deleteItem(TEMP_MEMBER_ID, cartItemId);
+        cartService.deleteItem(memberId, cartItemId);
         return ApiResponse.ok();
     }
 
@@ -55,7 +58,8 @@ public class CartController {
     public ApiResponse<CartItemResponse> updateItemQuantity(
             @PathVariable("cartItemId") Long cartItemId,
             @Valid @RequestBody CartItemUpdateRequest request,
-            BindingResult bindingResult
+            BindingResult bindingResult,
+            @AuthenticationPrincipal Long memberId
     ) {
         if (bindingResult.hasErrors()) {
             String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
@@ -63,20 +67,21 @@ public class CartController {
         }
 
         return ApiResponse.success(
-                cartService.updateItemQuantity(TEMP_MEMBER_ID, cartItemId, request)
+                cartService.updateItemQuantity(memberId, cartItemId, request)
         );
     }
 
     @PostMapping("/items")
     public ApiResponse<CartItemResponse> addItem(
             @Valid @RequestBody CartAddRequest request,
-            BindingResult bindingResult
+            BindingResult bindingResult,
+            @AuthenticationPrincipal Long memberId
     ) {
         if (bindingResult.hasErrors()) {
             String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
             throw new BusinessException(ErrorCode.INVALID_REQUEST, message);
         }
 
-        return ApiResponse.success(cartService.addItem(TEMP_MEMBER_ID, request));
+        return ApiResponse.success(cartService.addItem(memberId, request));
     }
 }
