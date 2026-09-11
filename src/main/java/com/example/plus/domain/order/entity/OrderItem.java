@@ -42,16 +42,18 @@ public class OrderItem {
 
     // 주문 상품 생성
     public OrderItem(
-            Order order,
             Product product,
             String productName,
             Long orderPrice,
             Integer quantity
     ) {
-        this.order = order;
         this.product = product;
         this.productName = productName;
         this.orderPrice = orderPrice;
         this.quantity = quantity;
+    }
+
+    void setOrder(Order order) {
+        this.order = order;
     }
 }

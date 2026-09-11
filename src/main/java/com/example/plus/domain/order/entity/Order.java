@@ -45,4 +45,9 @@ public class Order extends BaseEntity {
             orphanRemoval = true
     )
     private List<OrderItem> orderItems = new ArrayList<>();
+
+    public void addOrderItem(OrderItem orderItem) {
+        this.orderItems.add(orderItem);
+        orderItem.setOrder(this);
+    }
 }
