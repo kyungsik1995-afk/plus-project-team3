@@ -1,0 +1,39 @@
+package com.example.plus.domain.cart.controller;
+
+import com.example.plus.domain.cart.dto.CartAddRequest;
+import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.service.CartService;
+import com.example.plus.global.common.response.ApiResponse;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/carts")
+@RequiredArgsConstructor
+public class CartController {
+
+    // TODO(authentication): Replace this with the member ID supplied by the authenticated Principal.
+    private static final Long TEMP_MEMBER_ID = 1L;
+
+    private final CartService cartService;
+
+    @PostMapping("/items")
+    public ApiResponse<CartItemResponse> addItem(
+            @Valid @RequestBody CartAddRequest request,
+            BindingResult bindingResult
+    ) {
+        if (bindingResult.hasErrors()) {
+            String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, message);
+        }
+
+        return ApiResponse.success(cartService.addItem(TEMP_MEMBER_ID, request));
+    }
+}
