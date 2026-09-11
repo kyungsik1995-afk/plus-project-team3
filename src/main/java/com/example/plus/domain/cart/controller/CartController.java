@@ -2,6 +2,7 @@ package com.example.plus.domain.cart.controller;
 
 import com.example.plus.domain.cart.dto.CartAddRequest;
 import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartItemUpdateRequest;
 import com.example.plus.domain.cart.dto.CartResponse;
 import com.example.plus.domain.cart.service.CartService;
 import com.example.plus.global.common.response.ApiResponse;
@@ -11,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +32,22 @@ public class CartController {
     @GetMapping
     public ApiResponse<CartResponse> getCart() {
         return ApiResponse.success(cartService.getCart(TEMP_MEMBER_ID));
+    }
+
+    @PatchMapping("/items/{cartItemId}")
+    public ApiResponse<CartItemResponse> updateItemQuantity(
+            @PathVariable("cartItemId") Long cartItemId,
+            @Valid @RequestBody CartItemUpdateRequest request,
+            BindingResult bindingResult
+    ) {
+        if (bindingResult.hasErrors()) {
+            String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, message);
+        }
+
+        return ApiResponse.success(
+                cartService.updateItemQuantity(TEMP_MEMBER_ID, cartItemId, request)
+        );
     }
 
     @PostMapping("/items")
