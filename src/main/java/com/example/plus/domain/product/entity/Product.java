@@ -1,6 +1,8 @@
 package com.example.plus.domain.product.entity;
 
 import com.example.plus.global.common.entity.BaseEntity;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -58,4 +60,14 @@ public class Product extends BaseEntity {
             this.description = description;
         }
     }
+
+    public void decreaseStock(Integer quantity) {
+
+        if (stockQuantity < quantity) {
+            throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+        }
+
+        stockQuantity -= quantity;
+    }
+
 }
