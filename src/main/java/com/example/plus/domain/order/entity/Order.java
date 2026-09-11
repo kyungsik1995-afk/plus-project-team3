@@ -46,6 +46,19 @@ public class Order extends BaseEntity {
     )
     private List<OrderItem> orderItems = new ArrayList<>();
 
+    // 주문 생성
+    public Order(
+            Member member,
+            String orderNumber,
+            Long totalAmount,
+            OrderStatus status
+    ) {
+        this.member = member;
+        this.orderNumber = orderNumber;
+        this.totalAmount = totalAmount;
+        this.status = status;
+    }
+
     public void addOrderItem(OrderItem orderItem) {
         this.orderItems.add(orderItem);
         orderItem.setOrder(this);
