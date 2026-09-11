@@ -1,7 +1,7 @@
-package com.example.plus.global.payment.repository;
+package com.example.plus.domain.payment.repository;
 
-import com.example.plus.global.payment.entity.Refund;
-import com.example.plus.global.payment.entity.RefundStatus;
+import com.example.plus.domain.payment.entity.Refund;
+import com.example.plus.domain.payment.entity.RefundStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

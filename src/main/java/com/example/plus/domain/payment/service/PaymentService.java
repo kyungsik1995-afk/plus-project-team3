@@ -1,11 +1,11 @@
-package com.example.plus.global.payment.service;
+package com.example.plus.domain.payment.service;
 
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
-import com.example.plus.global.payment.dto.PaymentResponse;
-import com.example.plus.global.payment.entity.Payment;
-import com.example.plus.global.payment.entity.PaymentStatus;
-import com.example.plus.global.payment.repository.PaymentRepository;
+import com.example.plus.domain.payment.dto.PaymentResponse;
+import com.example.plus.domain.payment.entity.Payment;
+import com.example.plus.domain.payment.entity.PaymentStatus;
+import com.example.plus.domain.payment.repository.PaymentRepository;
 import com.example.plus.orders.entity.Order;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

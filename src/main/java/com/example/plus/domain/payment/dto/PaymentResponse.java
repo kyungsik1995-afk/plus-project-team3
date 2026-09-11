@@ -1,4 +1,4 @@
-package com.example.plus.global.payment.dto;
+package com.example.plus.domain.payment.dto;
 
 import java.time.LocalDateTime;
 

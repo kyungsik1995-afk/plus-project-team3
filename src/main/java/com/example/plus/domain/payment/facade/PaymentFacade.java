@@ -93,19 +93,19 @@
 //}
 
 
-package com.example.plus.global.payment.facade;
+package com.example.plus.domain.payment.facade;
 
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
-import com.example.plus.global.payment.dto.PaymentConfirmRequest;
-import com.example.plus.global.payment.dto.PaymentConfirmResponse;
-import com.example.plus.global.payment.dto.RefundRequest;
-import com.example.plus.global.payment.dto.RefundResponse;
-import com.example.plus.global.payment.entity.Payment;
-import com.example.plus.global.payment.entity.PaymentStatus;
-import com.example.plus.global.payment.service.PaymentCommandService;
-import com.example.plus.global.payment.service.PaymentRefundService;
-import com.example.plus.global.payment.service.PaymentService;
+import com.example.plus.domain.payment.dto.PaymentConfirmRequest;
+import com.example.plus.domain.payment.dto.PaymentConfirmResponse;
+import com.example.plus.domain.payment.dto.RefundRequest;
+import com.example.plus.domain.payment.dto.RefundResponse;
+import com.example.plus.domain.payment.entity.Payment;
+import com.example.plus.domain.payment.entity.PaymentStatus;
+import com.example.plus.domain.payment.service.PaymentCommandService;
+import com.example.plus.domain.payment.service.PaymentRefundService;
+import com.example.plus.domain.payment.service.PaymentService;
 import com.example.plus.orders.entity.Order;
 import com.example.plus.orders.entity.OrderStatus;
 import lombok.RequiredArgsConstructor;

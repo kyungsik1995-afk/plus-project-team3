@@ -1,4 +1,4 @@
-package com.example.plus.global.payment.entity;
+package com.example.plus.domain.payment.entity;
 
 import lombok.RequiredArgsConstructor;
 

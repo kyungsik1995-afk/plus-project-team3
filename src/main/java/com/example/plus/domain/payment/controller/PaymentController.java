@@ -1,4 +1,4 @@
-package com.example.plus.global.payment.controller;
+package com.example.plus.domain.payment.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
