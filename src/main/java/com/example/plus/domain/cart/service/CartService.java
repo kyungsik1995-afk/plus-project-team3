@@ -82,7 +82,7 @@ public class CartService {
     }
 
     private CartResponse createCartResponse(Cart cart) {
-        List<CartItemResponse> items = cartItemRepository.findAllByCart(cart).stream()
+        List<CartItemResponse> items = cartItemRepository.findAllByCartWithProduct(cart).stream()
                 .map(CartItemResponse::from)
                 .toList();
 
