@@ -63,4 +63,27 @@ public class Order extends BaseEntity {
         this.orderItems.add(orderItem);
         orderItem.setOrder(this);
     }
+
+    // 결제 승인 시 주문 상태를 완료 상태로 변경한다.
+    public void confirm() {
+
+        // 결제 대기 상태의 주문만 완료할 수 있다.
+        if (status != OrderStatus.PAYMENT_PENDING) {
+            throw new IllegalStateException("결제 대기 상태의 주문만 완료할 수 있습니다.");
+        }
+
+        status = OrderStatus.COMPLETED;
+    }
+
+    // 주문을 취소한다.
+    public void cancel() {
+
+        // 결제 대기 또는 결제 완료 상태의 주문만 취소할 수 있다.
+        if (status != OrderStatus.PAYMENT_PENDING
+                && status != OrderStatus.COMPLETED) {
+            throw new IllegalStateException("취소할 수 없는 주문 상태입니다.");
+        }
+
+        status = OrderStatus.CANCELED;
+    }
 }
