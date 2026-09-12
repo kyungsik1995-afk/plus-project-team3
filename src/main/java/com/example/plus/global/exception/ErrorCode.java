@@ -42,7 +42,12 @@ public enum ErrorCode {
     INVALID_PAYMENT_STATUS(HttpStatus.CONFLICT, "PAYMENT_002", "현재 결제 상태에서는 처리할 수 없습니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_003", "결제 금액이 일치하지 않습니다."),
     ALREADY_PROCESSED_PAYMENT(HttpStatus.CONFLICT, "PAYMENT_004", "이미 처리된 결제입니다."),
-    PAYMENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "PAYMENT_005", "본인의 결제가 아닙니다.");
+    PAYMENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "PAYMENT_005", "본인의 결제가 아닙니다."),
+    ALREADY_PROCESSED_REFUND(HttpStatus.CONFLICT, "PAYMENT_006", "이미 환불 처리된 결제입니다."),
+    INVALID_REFUND_ITEM(HttpStatus.BAD_REQUEST, "PAYMENT_007", "유효하지 않은 환불 상품입니다."),
+    INVALID_REFUND_QUANTITY(HttpStatus.BAD_REQUEST, "PAYMENT_008", "환불 수량은 1개 이상이어야 합니다."),
+    REFUND_QUANTITY_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_009", "환불 수량이 주문 수량을 초과합니다."),
+    REFUND_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_010", "환불 금액이 결제 금액을 초과합니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
