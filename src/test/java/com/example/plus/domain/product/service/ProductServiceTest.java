@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -136,6 +137,108 @@ class ProductServiceTest {
     }
 
     @Test
+    void updateProductUpdatesAllProvidedFields() {
+        Long productId = 1L;
+        Product product = createProduct(
+                "기존 상품",
+                ProductCategory.FOOD,
+                10_000L,
+                "기존 설명"
+        );
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                "수정 상품",
+                ProductCategory.ELECTRONICS,
+                20_000L,
+                "수정 설명"
+        );
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.updateProduct(productId, request);
+
+        assertEquals("수정 상품", product.getName());
+        assertEquals(ProductCategory.ELECTRONICS, product.getCategory());
+        assertEquals(20_000L, product.getPrice());
+        assertEquals("수정 설명", product.getDescription());
+        assertEquals("수정 상품", response.name());
+        assertEquals(ProductCategory.ELECTRONICS, response.category());
+        assertEquals(20_000L, response.price());
+        assertEquals("수정 설명", response.description());
+        verify(productRepository).findById(productId);
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateProductUpdatesOnlyProvidedNameAndKeepsNullFields() {
+        Long productId = 1L;
+        Product product = createProduct(
+                "기존 상품",
+                ProductCategory.FOOD,
+                10_000L,
+                "기존 설명"
+        );
+        ProductUpdateRequest request = new ProductUpdateRequest("수정 상품", null, null, null);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.updateProduct(productId, request);
+
+        assertEquals("수정 상품", product.getName());
+        assertEquals(ProductCategory.FOOD, product.getCategory());
+        assertEquals(10_000L, product.getPrice());
+        assertEquals("기존 설명", product.getDescription());
+        assertEquals("수정 상품", response.name());
+        assertEquals(ProductCategory.FOOD, response.category());
+        assertEquals(10_000L, response.price());
+        assertEquals("기존 설명", response.description());
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateProductUpdatesOnlyProvidedDescriptionAndKeepsNullFields() {
+        Long productId = 1L;
+        Product product = createProduct(
+                "기존 상품",
+                ProductCategory.FOOD,
+                10_000L,
+                "기존 설명"
+        );
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, "수정 설명");
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.updateProduct(productId, request);
+
+        assertEquals("기존 상품", product.getName());
+        assertEquals(ProductCategory.FOOD, product.getCategory());
+        assertEquals(10_000L, product.getPrice());
+        assertEquals("수정 설명", product.getDescription());
+        assertEquals("기존 상품", response.name());
+        assertEquals(ProductCategory.FOOD, response.category());
+        assertEquals(10_000L, response.price());
+        assertEquals("수정 설명", response.description());
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateProductRejectsMissingProduct() {
+        Long productId = 1L;
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                "수정 상품",
+                null,
+                null,
+                null
+        );
+        when(productRepository.findById(productId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> productService.updateProduct(productId, request)
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verify(productRepository).findById(productId);
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
     void productListRequestUsesDefaultPageAndSize() {
         ProductListRequest request = new ProductListRequest(null, null, null, null, null);
 
@@ -233,5 +336,19 @@ class ProductServiceTest {
         try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
             return validatorFactory.getValidator().validate(request);
         }
+    }
+
+    private Product createProduct(
+            String name,
+            ProductCategory category,
+            Long price,
+            String description
+    ) {
+        Product product = new TestProduct();
+        product.update(name, category, price, description);
+        return product;
+    }
+
+    private static class TestProduct extends Product {
     }
 }
