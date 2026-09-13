@@ -5,13 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.example.plus.domain.product.dto.ProductDetailResponse;
 import com.example.plus.domain.product.dto.ProductListRequest;
 import com.example.plus.domain.product.dto.ProductListResponse;
 import com.example.plus.domain.product.dto.ProductUpdateRequest;
+import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.entity.ProductCategory;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
@@ -19,6 +22,7 @@ import com.example.plus.global.exception.business.BusinessException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -91,6 +95,44 @@ class ProductServiceTest {
 
         assertEquals(ErrorCode.INVALID_REQUEST, exception.getErrorCode());
         verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void getProductDetailReturnsProductDetailResponse() {
+        Long productId = 1L;
+        Product product = mock(Product.class);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(product.getId()).thenReturn(productId);
+        when(product.getName()).thenReturn("테스트 상품");
+        when(product.getCategory()).thenReturn(ProductCategory.FOOD);
+        when(product.getPrice()).thenReturn(10_000L);
+        when(product.getStockQuantity()).thenReturn(5);
+        when(product.getDescription()).thenReturn("테스트 상품 설명");
+
+        ProductDetailResponse response = productService.getProductDetail(productId);
+
+        assertEquals(productId, response.productId());
+        assertEquals("테스트 상품", response.name());
+        assertEquals(ProductCategory.FOOD, response.category());
+        assertEquals(10_000L, response.price());
+        assertEquals(5, response.stockQuantity());
+        assertEquals("테스트 상품 설명", response.description());
+        verify(productRepository).findById(productId);
+    }
+
+    @Test
+    void getProductDetailRejectsMissingProduct() {
+        Long productId = 1L;
+        when(productRepository.findById(productId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> productService.getProductDetail(productId)
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verify(productRepository).findById(productId);
     }
 
     @Test
