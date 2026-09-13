@@ -1,11 +1,14 @@
 package com.example.plus.domain.cart.entity;
 
+import com.example.plus.domain.member.entity.Member;
 import com.example.plus.global.common.entity.BaseEntity;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -28,15 +31,15 @@ public class Cart extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // TODO(member-integration): Replace this temporary ID with the actual Member JPA association.
-    @Column(name = "member_id", nullable = false)
-    private Long memberId;
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
 
-    private Cart(Long memberId) {
-        this.memberId = memberId;
+    private Cart(Member member) {
+        this.member = member;
     }
 
-    public static Cart create(Long memberId) {
-        return new Cart(memberId);
+    public static Cart create(Member member) {
+        return new Cart(member);
     }
 }
