@@ -8,6 +8,8 @@ import com.example.plus.domain.cart.entity.Cart;
 import com.example.plus.domain.cart.entity.CartItem;
 import com.example.plus.domain.cart.repository.CartItemRepository;
 import com.example.plus.domain.cart.repository.CartRepository;
+import com.example.plus.domain.member.entity.Member;
+import com.example.plus.domain.member.repository.MemberRepository;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
@@ -26,16 +28,17 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
+    private final MemberRepository memberRepository;
 
     public CartResponse getCart(Long memberId) {
-        return cartRepository.findByMemberId(memberId)
+        return cartRepository.findByMember_Id(memberId)
                 .map(this::createCartResponse)
                 .orElseGet(() -> new CartResponse(List.of(), 0L));
     }
 
     @Transactional
     public void clearCart(Long memberId) {
-        cartRepository.findByMemberId(memberId)
+        cartRepository.findByMember_Id(memberId)
                 .ifPresent(cart -> cartItemRepository.deleteAll(
                         cartItemRepository.findAllByCart(cart)
                 ));
@@ -65,8 +68,8 @@ public class CartService {
         Product product = productRepository.findById(request.productId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        Cart cart = cartRepository.findByMemberId(memberId)
-                .orElseGet(() -> cartRepository.save(Cart.create(memberId)));
+        Cart cart = cartRepository.findByMember_Id(memberId)
+                .orElseGet(() -> createCart(memberId));
 
         CartItem cartItem = cartItemRepository.findByCartAndProduct(cart, product)
                 .map(existingItem -> addToExistingItem(existingItem, request.quantity(), product))
@@ -87,6 +90,13 @@ public class CartService {
         return new CartResponse(items, totalPrice);
     }
 
+    private Cart createCart(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        return cartRepository.save(Cart.create(member));
+    }
+
     private CartItem findOwnedCartItem(Long memberId, Long cartItemId) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
@@ -96,7 +106,7 @@ public class CartService {
     }
 
     private void validateOwnership(Long memberId, CartItem cartItem) {
-        if (!Objects.equals(memberId, cartItem.getCart().getMemberId())) {
+        if (!Objects.equals(memberId, cartItem.getCart().getMember().getId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
     }
