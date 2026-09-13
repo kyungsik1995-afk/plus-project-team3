@@ -11,10 +11,14 @@ import com.example.plus.domain.order.entity.OrderItem;
 import com.example.plus.domain.order.service.OrderService;
 import com.example.plus.domain.payment.service.PaymentService;
 import com.example.plus.domain.product.entity.Product;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -26,31 +30,54 @@ public class OrderFacade {
     private final CartService cartService;
     private final PaymentService paymentService;
 
-    /**
-     * 주문 생성
-     *
-     * 주문 생성에 필요한 여러 도메인의 작업을 하나의 트랜잭션으로 묶는다.
-     * 회원 확인 → 장바구니 상품 확인 → 재고 차감 → 주문 생성 → 결제 생성
-     * 과정을 하나의 흐름으로 조율한다.
-     */
     @Transactional
     public OrderCheckoutResponse createOrder(
             Long memberId,
             OrderCheckoutRequest request
     ) {
-        // 주문을 생성할 회원을 조회하고, 존재하지 않으면 예외를 발생시킨다.
+        // 1. 회원 존재 여부 확인
         Member member = memberService.findById(memberId);
 
-        // 회원의 장바구니 상품을 조회한다.
+        // 2. 현재 회원의 장바구니 상품 조회
         List<CartItem> cartItems = cartService.getCartItems(memberId);
 
-        // 장바구니 상품을 주문 상품으로 변환하고 재고를 차감한다.
-        List<OrderItem> orderItems = cartItems.stream()
+        // 3. 주문할 장바구니 상품 결정
+        List<CartItem> orderCartItems;
+
+        if (request.cartItemIds().isEmpty()) {
+            // cartItemIds가 비어 있으면 장바구니 전체를 주문한다.
+            orderCartItems = cartItems;
+        } else {
+            // cartItemIds가 있으면 해당 상품만 주문한다.
+            Set<Long> selectedCartItemIds = Set.copyOf(request.cartItemIds());
+
+            orderCartItems = cartItems.stream()
+                    .filter(cartItem ->
+                            selectedCartItemIds.contains(cartItem.getId())
+                    )
+                    .toList();
+
+            // 요청한 상품 중 현재 회원의 장바구니에 없는 상품이 있는지 확인한다.
+            if (orderCartItems.size() != selectedCartItemIds.size()) {
+                throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
+            }
+        }
+
+        // 4. 주문할 상품이 하나도 없는 경우
+        if (orderCartItems.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // 5. 장바구니 상품을 OrderItem으로 변환하면서 재고 차감
+        List<OrderItem> orderItems = orderCartItems.stream()
                 .map(cartItem -> {
                     Product product = cartItem.getProduct();
 
+                    // 재고가 부족하면 BusinessException이 발생하고
+                    // @Transactional에 의해 지금까지의 변경도 함께 롤백된다.
                     product.decreaseStock(cartItem.getQuantity());
 
+                    // 주문 당시 상품명과 가격을 스냅샷으로 저장한다.
                     return new OrderItem(
                             product,
                             product.getName(),
@@ -60,27 +87,27 @@ public class OrderFacade {
                 })
                 .toList();
 
-        // 총 주문 금액을 계산한다.
+        // 6. 주문 총 금액 계산
         Long totalAmount = orderItems.stream()
                 .mapToLong(orderItem ->
                         orderItem.getOrderPrice() * orderItem.getQuantity()
                 )
                 .sum();
 
-        // 주문을 생성한다.
+        // 7. Order 생성
         Order order = orderService.createOrder(
                 member,
                 orderItems,
                 totalAmount
         );
 
-        // 주문에 대한 결제 정보를 생성한다.
+        // 8. 결제 대기 상태의 Payment 생성
         paymentService.createPayment(order, totalAmount);
 
-        // 주문이 생성되었으므로 장바구니를 비운다.
-        cartService.clearCart(memberId);
+        // 9. 주문 생성 시에는 장바구니를 삭제하지 않는다.
+        //    장바구니 삭제는 모의 결제 성공 시 처리한다.
 
-        // 주문 생성 결과를 반환한다.
+        // 10. 주문 생성 결과 반환
         return new OrderCheckoutResponse(
                 order.getId(),
                 order.getOrderNumber(),

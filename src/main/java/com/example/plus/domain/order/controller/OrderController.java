@@ -1,15 +1,21 @@
 package com.example.plus.domain.order.controller;
 
+import com.example.plus.domain.order.dto.OrderCheckoutRequest;
+import com.example.plus.domain.order.dto.OrderCheckoutResponse;
+import com.example.plus.domain.order.dto.OrderItemResponse;
 import com.example.plus.domain.order.dto.OrderResponse;
 import com.example.plus.domain.order.entity.Order;
+import com.example.plus.domain.order.facade.OrderFacade;
 import com.example.plus.domain.order.service.OrderService;
 import com.example.plus.global.common.response.ApiResponse;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -19,10 +25,25 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderFacade orderFacade;
 
-    /**
-     * 내 주문 목록을 최신순으로 조회한다.
-     */
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<OrderCheckoutResponse> createOrder(
+            @AuthenticationPrincipal Long memberId,
+            @Valid @RequestBody OrderCheckoutRequest request,
+            BindingResult bindingResult
+    ) {
+        if (bindingResult.hasErrors()) {
+            String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, message);
+        }
+
+        return ApiResponse.success(
+                orderFacade.createOrder(memberId, request)
+        );
+    }
+
     @GetMapping
     public ApiResponse<List<OrderResponse>> getMyOrders(
             @AuthenticationPrincipal Long memberId
@@ -35,12 +56,6 @@ public class OrderController {
         return ApiResponse.success(responses);
     }
 
-    /**
-     * 특정 주문의 상세 정보를 조회한다.
-     *
-     * 주문 ID뿐만 아니라 현재 로그인한 회원의 ID를 함께 전달하여
-     * 본인의 주문인지 OrderService에서 확인한다.
-     */
     @GetMapping("/{orderId}")
     public ApiResponse<OrderResponse> getOrder(
             @AuthenticationPrincipal Long memberId,
