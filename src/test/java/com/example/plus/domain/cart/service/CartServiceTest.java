@@ -492,9 +492,6 @@ class CartServiceTest {
 
     @Test
     void addItemRejectsMissingProduct() {
-        Cart cart = Cart.create(MEMBER_ID);
-
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(
@@ -507,6 +504,23 @@ class CartServiceTest {
 
         assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
         verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void addItemDoesNotCreateCartWhenCartAndProductDoNotExist() {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(
+                        MEMBER_ID,
+                        new CartAddRequest(PRODUCT_ID, 1)
+                )
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verify(cartRepository, never()).findByMemberId(MEMBER_ID);
+        verify(cartRepository, never()).save(any(Cart.class));
     }
 
     @Test
