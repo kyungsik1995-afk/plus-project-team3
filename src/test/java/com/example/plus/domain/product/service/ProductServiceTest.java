@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.plus.domain.product.dto.ProductListRequest;
 import com.example.plus.domain.product.dto.ProductListResponse;
+import com.example.plus.domain.product.dto.ProductUpdateRequest;
 import com.example.plus.domain.product.entity.ProductCategory;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
@@ -136,7 +137,57 @@ class ProductServiceTest {
         assertTrue(validate(request).isEmpty());
     }
 
-    private Set<ConstraintViolation<ProductListRequest>> validate(ProductListRequest request) {
+    @Test
+    void productUpdateRequestAllowsNameWith200Characters() {
+        ProductUpdateRequest request = new ProductUpdateRequest("가".repeat(200), null, null, null);
+
+        assertTrue(validate(request).isEmpty());
+    }
+
+    @Test
+    void productUpdateRequestRejectsNameOver200Characters() {
+        ProductUpdateRequest request = new ProductUpdateRequest("가".repeat(201), null, null, null);
+
+        Set<ConstraintViolation<ProductUpdateRequest>> violations = validate(request);
+
+        assertTrue(violations.stream()
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("name")));
+    }
+
+    @Test
+    void productUpdateRequestRejectsBlankName() {
+        ProductUpdateRequest request = new ProductUpdateRequest("   ", null, null, null);
+
+        Set<ConstraintViolation<ProductUpdateRequest>> violations = validate(request);
+
+        assertTrue(violations.stream()
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("name")));
+    }
+
+    @Test
+    void productUpdateRequestAllowsNullNameWhenAnotherFieldIsPresent() {
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null,
+                ProductCategory.FOOD,
+                null,
+                null
+        );
+
+        assertTrue(validate(request).isEmpty());
+    }
+
+    @Test
+    void productUpdateRequestRejectsEmptyPatch() {
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, null);
+
+        Set<ConstraintViolation<ProductUpdateRequest>> violations = validate(request);
+
+        assertTrue(violations.stream()
+                .anyMatch(violation -> violation.getPropertyPath().toString()
+                        .equals("anyFieldPresent")));
+    }
+
+    private <T> Set<ConstraintViolation<T>> validate(T request) {
         try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
             return validatorFactory.getValidator().validate(request);
         }

@@ -4,9 +4,11 @@ import com.example.plus.domain.product.entity.ProductCategory;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public record ProductUpdateRequest(
         @Pattern(regexp = ".*\\S.*", message = "상품명은 공백일 수 없습니다.")
+        @Size(max = 200, message = "상품명은 200자 이하여야 합니다.")
         String name,
 
         ProductCategory category,
