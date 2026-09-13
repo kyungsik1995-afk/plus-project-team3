@@ -43,10 +43,7 @@ public class CartService {
 
     @Transactional
     public void deleteItem(Long memberId, Long cartItemId) {
-        CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
-
-        validateOwnership(memberId, cartItem);
+        CartItem cartItem = findOwnedCartItem(memberId, cartItemId);
         cartItemRepository.delete(cartItem);
     }
 
@@ -56,10 +53,7 @@ public class CartService {
             Long cartItemId,
             CartItemUpdateRequest request
     ) {
-        CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
-
-        validateOwnership(memberId, cartItem);
+        CartItem cartItem = findOwnedCartItem(memberId, cartItemId);
         validateStock(cartItem.getProduct(), request.quantity());
         cartItem.changeQuantity(request.quantity());
 
@@ -68,11 +62,11 @@ public class CartService {
 
     @Transactional
     public CartItemResponse addItem(Long memberId, CartAddRequest request) {
-        Cart cart = cartRepository.findByMemberId(memberId)
-                .orElseGet(() -> cartRepository.save(Cart.create(memberId)));
-
         Product product = productRepository.findById(request.productId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        Cart cart = cartRepository.findByMemberId(memberId)
+                .orElseGet(() -> cartRepository.save(Cart.create(memberId)));
 
         CartItem cartItem = cartItemRepository.findByCartAndProduct(cart, product)
                 .map(existingItem -> addToExistingItem(existingItem, request.quantity(), product))
@@ -91,6 +85,14 @@ public class CartService {
                 .sum();
 
         return new CartResponse(items, totalPrice);
+    }
+
+    private CartItem findOwnedCartItem(Long memberId, Long cartItemId) {
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
+
+        validateOwnership(memberId, cartItem);
+        return cartItem;
     }
 
     private void validateOwnership(Long memberId, CartItem cartItem) {
