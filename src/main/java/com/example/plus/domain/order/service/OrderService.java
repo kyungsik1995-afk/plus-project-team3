@@ -7,6 +7,8 @@ import com.example.plus.domain.order.entity.Order;
 import com.example.plus.domain.order.entity.OrderItem;
 import com.example.plus.domain.order.entity.OrderStatus;
 import com.example.plus.domain.order.repository.OrderRepository;
+import com.example.plus.domain.payment.entity.Payment;
+import com.example.plus.domain.payment.service.PaymentService;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ import java.util.UUID;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final PaymentService paymentService;
 
     /**
      * 주문을 생성하고 저장한다.
@@ -82,11 +85,16 @@ public class OrderService {
                 ))
                 .toList();
 
+// 주문에 연결된 결제 정보를 조회한다.
+        // Payment → Order 단방향 연관관계는 그대로 유지한다.
+        Payment payment = paymentService.findByOrderIdWithOrder(order.getId());
+
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNumber(),
                 order.getTotalAmount(),
                 order.getStatus().name(),
+                payment.getStatus().name(),
                 order.getCreatedAt(),
                 orderItems
         );
