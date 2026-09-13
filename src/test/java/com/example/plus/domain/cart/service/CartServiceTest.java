@@ -16,6 +16,8 @@ import com.example.plus.domain.cart.entity.Cart;
 import com.example.plus.domain.cart.entity.CartItem;
 import com.example.plus.domain.cart.repository.CartItemRepository;
 import com.example.plus.domain.cart.repository.CartRepository;
+import com.example.plus.domain.member.entity.Member;
+import com.example.plus.domain.member.repository.MemberRepository;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class CartServiceTest {
@@ -43,12 +46,15 @@ class CartServiceTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private MemberRepository memberRepository;
+
     @InjectMocks
     private CartService cartService;
 
     @Test
     void getCartReturnsEmptyResponseWhenCartDoesNotExist() {
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
 
         CartResponse response = cartService.getCart(MEMBER_ID);
 
@@ -59,9 +65,9 @@ class CartServiceTest {
 
     @Test
     void getCartReturnsEmptyResponseWhenCartHasNoItems() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of());
 
         CartResponse response = cartService.getCart(MEMBER_ID);
@@ -72,10 +78,10 @@ class CartServiceTest {
 
     @Test
     void getCartCalculatesSingleItemTotalPrice() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         CartItem cartItem = cartItemForResponse(100L, PRODUCT_ID, "상품 A", 10_000L, 3);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of(cartItem));
 
         CartResponse response = cartService.getCart(MEMBER_ID);
@@ -86,11 +92,11 @@ class CartServiceTest {
 
     @Test
     void getCartSumsMultipleItemTotalPrices() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         CartItem firstItem = cartItemForResponse(100L, 10L, "상품 A", 10_000L, 2);
         CartItem secondItem = cartItemForResponse(200L, 20L, "상품 B", 30_000L, 3);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCartWithProduct(cart))
                 .thenReturn(List.of(firstItem, secondItem));
 
@@ -102,7 +108,7 @@ class CartServiceTest {
 
     @Test
     void getCartIncludesCartItemAndProductInformation() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         CartItem cartItem = cartItemForResponse(
                 100L,
                 PRODUCT_ID,
@@ -111,7 +117,7 @@ class CartServiceTest {
                 3
         );
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of(cartItem));
 
         CartItemResponse itemResponse = cartService.getCart(MEMBER_ID).items().get(0);
@@ -126,7 +132,7 @@ class CartServiceTest {
 
     @Test
     void clearCartDeletesAllItemsWhenMultipleItemsExist() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         CartItem firstItem = CartItem.create(
                 cart,
                 org.mockito.Mockito.mock(Product.class),
@@ -139,7 +145,7 @@ class CartServiceTest {
         );
         List<CartItem> cartItems = List.of(firstItem, secondItem);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCart(cart)).thenReturn(cartItems);
 
         cartService.clearCart(MEMBER_ID);
@@ -149,10 +155,10 @@ class CartServiceTest {
 
     @Test
     void clearCartCompletesWhenCartHasNoItems() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         List<CartItem> emptyItems = List.of();
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCart(cart)).thenReturn(emptyItems);
 
         cartService.clearCart(MEMBER_ID);
@@ -162,7 +168,7 @@ class CartServiceTest {
 
     @Test
     void clearCartCompletesWhenCartDoesNotExist() {
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
 
         cartService.clearCart(MEMBER_ID);
 
@@ -171,9 +177,9 @@ class CartServiceTest {
 
     @Test
     void clearCartDoesNotDeleteCartEntity() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of());
 
         cartService.clearCart(MEMBER_ID);
@@ -183,13 +189,13 @@ class CartServiceTest {
 
     @Test
     void clearCartDoesNotChangeProductStock() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productWithStock(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
         List<CartItem> cartItems = List.of(cartItem);
         int stockBefore = product.getStockQuantity();
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCart(cart)).thenReturn(cartItems);
 
         cartService.clearCart(MEMBER_ID);
@@ -200,7 +206,7 @@ class CartServiceTest {
 
     @Test
     void deleteItemDeletesOwnedCartItem() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = org.mockito.Mockito.mock(Product.class);
         CartItem cartItem = CartItem.create(cart, product, 3);
 
@@ -225,7 +231,7 @@ class CartServiceTest {
 
     @Test
     void deleteItemRejectsAnotherMembersItem() {
-        Cart anotherMembersCart = Cart.create(2L);
+        Cart anotherMembersCart = cartForMember(2L);
         Product product = org.mockito.Mockito.mock(Product.class);
         CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
 
@@ -241,7 +247,7 @@ class CartServiceTest {
 
     @Test
     void deleteItemDoesNotDeleteAnotherMembersItem() {
-        Cart anotherMembersCart = Cart.create(2L);
+        Cart anotherMembersCart = cartForMember(2L);
         Product product = org.mockito.Mockito.mock(Product.class);
         CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
 
@@ -257,7 +263,7 @@ class CartServiceTest {
 
     @Test
     void deleteItemDoesNotChangeProductStock() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productWithStock(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
         int stockBefore = product.getStockQuantity();
@@ -272,7 +278,7 @@ class CartServiceTest {
 
     @Test
     void updateItemQuantityChangesToRequestedFinalQuantity() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productForSuccess(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
 
@@ -292,7 +298,7 @@ class CartServiceTest {
 
     @Test
     void updateItemQuantityDoesNotAddRequestedQuantity() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productForSuccess(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
 
@@ -309,7 +315,7 @@ class CartServiceTest {
 
     @Test
     void updateItemQuantityAllowsQuantityEqualToStock() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productForSuccess(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
 
@@ -327,7 +333,7 @@ class CartServiceTest {
 
     @Test
     void updateItemQuantityRejectsQuantityOverStockWithoutChangingItem() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productWithStock(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
 
@@ -364,7 +370,7 @@ class CartServiceTest {
 
     @Test
     void updateItemQuantityRejectsAnotherMembersItemWithoutChangingQuantity() {
-        Cart anotherMembersCart = Cart.create(2L);
+        Cart anotherMembersCart = cartForMember(2L);
         Product product = org.mockito.Mockito.mock(Product.class);
         CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
 
@@ -385,7 +391,7 @@ class CartServiceTest {
 
     @Test
     void updateItemQuantityDoesNotChangeProductStock() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productForSuccess(10);
         CartItem cartItem = CartItem.create(cart, product, 3);
         int stockBefore = product.getStockQuantity();
@@ -404,10 +410,12 @@ class CartServiceTest {
 
     @Test
     void addItemCreatesCartAndNewCartItem() {
+        Member member = memberWithId(MEMBER_ID);
         Product product = productForSuccess(10);
         CartAddRequest request = new CartAddRequest(PRODUCT_ID, 3);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(cartItemRepository.findByCartAndProduct(any(Cart.class), any(Product.class)))
@@ -420,17 +428,37 @@ class CartServiceTest {
         assertEquals(PRODUCT_ID, response.productId());
         assertEquals(3, response.quantity());
         assertEquals(3_000L, response.itemTotalPrice());
+        verify(memberRepository).findById(MEMBER_ID);
         verify(cartRepository).save(any(Cart.class));
         verify(cartItemRepository).save(any(CartItem.class));
     }
 
     @Test
+    void addItemRejectsMissingMemberWithoutSavingCartOrCartItem() {
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartAddRequest request = new CartAddRequest(PRODUCT_ID, 3);
+
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(MEMBER_ID, request)
+        );
+
+        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
+        verify(cartRepository, never()).save(any(Cart.class));
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
     void addItemAddsQuantityWithoutCreatingAnotherRow() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productForSuccess(10);
         CartItem existingItem = CartItem.create(cart, product, 3);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(cartItemRepository.findByCartAndProduct(cart, product))
                 .thenReturn(Optional.of(existingItem));
@@ -447,10 +475,10 @@ class CartServiceTest {
 
     @Test
     void addItemRejectsFirstQuantityOverStock() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productWithStock(10);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(cartItemRepository.findByCartAndProduct(cart, product)).thenReturn(Optional.empty());
 
@@ -468,11 +496,11 @@ class CartServiceTest {
 
     @Test
     void addItemRejectsCombinedQuantityOverStockWithoutChangingExistingItem() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productWithStock(10);
         CartItem existingItem = CartItem.create(cart, product, 7);
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(cartItemRepository.findByCartAndProduct(cart, product))
                 .thenReturn(Optional.of(existingItem));
@@ -519,17 +547,18 @@ class CartServiceTest {
         );
 
         assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
-        verify(cartRepository, never()).findByMemberId(MEMBER_ID);
+        verify(cartRepository, never()).findByMember_Id(MEMBER_ID);
+        verify(memberRepository, never()).findById(MEMBER_ID);
         verify(cartRepository, never()).save(any(Cart.class));
     }
 
     @Test
     void addItemDoesNotDecreaseProductStock() {
-        Cart cart = Cart.create(MEMBER_ID);
+        Cart cart = cartForMember(MEMBER_ID);
         Product product = productForSuccess(10);
         int stockBefore = product.getStockQuantity();
 
-        when(cartRepository.findByMemberId(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(cartItemRepository.findByCartAndProduct(cart, product)).thenReturn(Optional.empty());
         when(cartItemRepository.save(any(CartItem.class)))
@@ -539,6 +568,21 @@ class CartServiceTest {
 
         assertEquals(stockBefore, product.getStockQuantity());
         verify(productRepository, never()).save(any(Product.class));
+    }
+
+    private Cart cartForMember(Long memberId) {
+        return Cart.create(memberWithId(memberId));
+    }
+
+    private Member memberWithId(Long memberId) {
+        Member member = new Member(
+                "member-" + memberId + "@example.com",
+                "password",
+                "회원",
+                "010-0000-0000"
+        );
+        ReflectionTestUtils.setField(member, "id", memberId);
+        return member;
     }
 
     private Product productForSuccess(Integer stockQuantity) {
