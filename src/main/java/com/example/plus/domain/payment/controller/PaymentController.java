@@ -24,11 +24,10 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<?>> getPaymentById(
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long id
-    ) {
+    )
+    {
         return ResponseEntity.ok(
-                ApiResponse.success(
-                        paymentService.getPayment(memberId, id)
-                )
+                ApiResponse.success(paymentService.getPayment(memberId, id))
         );
     }
 
@@ -37,11 +36,10 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<?>> confirmPayment(
             @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody PaymentConfirmRequest confirmRequest
-    ) {
+    )
+    {
         return ResponseEntity.ok(
-                ApiResponse.success(
-                        paymentFacade.paymentConfirm(memberId, confirmRequest)
-                )
+                ApiResponse.success(paymentFacade.paymentConfirm(memberId, confirmRequest))
         );
     }
 
@@ -53,15 +51,10 @@ public class PaymentController {
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long id,
             @Valid @RequestBody(required = false) RefundRequest refundRequest
-    ) {
+    )
+    {
         return ResponseEntity.ok(
-                ApiResponse.success(
-                        paymentFacade.paymentRefund(
-                                memberId,
-                                id,
-                                refundRequest
-                        )
-                )
+                ApiResponse.success(paymentFacade.paymentRefund(memberId, id, refundRequest))
         );
     }
 }
