@@ -1,5 +1,6 @@
 package com.example.plus.domain.payment.service;
 
+import com.example.plus.domain.cart.service.CartService;
 import com.example.plus.domain.payment.dto.PaymentConfirmResponse;
 import com.example.plus.domain.payment.entity.Payment;
 import com.example.plus.domain.order.entity.Order;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentCommandService {
 
     private final PaymentService paymentService;
+    private final CartService cartService;
 
     @Transactional
     public PaymentConfirmResponse approvePaymentAndOrder(Long orderId) {
@@ -21,6 +23,8 @@ public class PaymentCommandService {
         paymentService.confirmPayment(payment);
         order.confirm();
 
+        cartService.clearCart(order.getMember().getId());
+
         return new PaymentConfirmResponse(
                 payment.getId(),
                 order.getId(),
@@ -29,4 +33,5 @@ public class PaymentCommandService {
                 order.getStatus().name()
         );
     }
+
 }
