@@ -131,6 +131,60 @@ class CartServiceTest {
     }
 
     @Test
+    void getCartItemsReturnsItemsFromMembersCartUsingProductFetchQuery() {
+        Cart cart = cartForMember(MEMBER_ID);
+        CartItem cartItem = CartItem.create(
+                cart,
+                org.mockito.Mockito.mock(Product.class),
+                2
+        );
+        List<CartItem> cartItems = List.of(cartItem);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(cartItems);
+
+        List<CartItem> result = cartService.getCartItems(MEMBER_ID);
+
+        assertEquals(cartItems, result);
+        verify(cartRepository).findByMember_Id(MEMBER_ID);
+        verify(cartItemRepository).findAllByCartWithProduct(cart);
+    }
+
+    @Test
+    void getCartItemsRejectsMissingCart() {
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.getCartItems(MEMBER_ID)
+        );
+
+        assertEquals(ErrorCode.CART_NOT_FOUND, exception.getErrorCode());
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void getCartItemsQueriesOnlyAuthenticatedMembersCart() {
+        Cart membersCart = cartForMember(MEMBER_ID);
+        Cart anotherMembersCart = cartForMember(2L);
+        CartItem membersItem = CartItem.create(
+                membersCart,
+                org.mockito.Mockito.mock(Product.class),
+                1
+        );
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(membersCart));
+        when(cartItemRepository.findAllByCartWithProduct(membersCart))
+                .thenReturn(List.of(membersItem));
+
+        List<CartItem> result = cartService.getCartItems(MEMBER_ID);
+
+        assertEquals(List.of(membersItem), result);
+        verify(cartItemRepository).findAllByCartWithProduct(membersCart);
+        verify(cartItemRepository, never()).findAllByCartWithProduct(anotherMembersCart);
+    }
+
+    @Test
     void clearCartDeletesAllItemsWhenMultipleItemsExist() {
         Cart cart = cartForMember(MEMBER_ID);
         CartItem firstItem = CartItem.create(
