@@ -5,12 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.example.plus.domain.product.dto.ProductDetailResponse;
 import com.example.plus.domain.product.dto.ProductListRequest;
 import com.example.plus.domain.product.dto.ProductListResponse;
+import com.example.plus.domain.product.dto.ProductUpdateRequest;
+import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.entity.ProductCategory;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
@@ -18,6 +23,7 @@ import com.example.plus.global.exception.business.BusinessException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -93,6 +99,146 @@ class ProductServiceTest {
     }
 
     @Test
+    void getProductDetailReturnsProductDetailResponse() {
+        Long productId = 1L;
+        Product product = mock(Product.class);
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(product.getId()).thenReturn(productId);
+        when(product.getName()).thenReturn("테스트 상품");
+        when(product.getCategory()).thenReturn(ProductCategory.FOOD);
+        when(product.getPrice()).thenReturn(10_000L);
+        when(product.getStockQuantity()).thenReturn(5);
+        when(product.getDescription()).thenReturn("테스트 상품 설명");
+
+        ProductDetailResponse response = productService.getProductDetail(productId);
+
+        assertEquals(productId, response.productId());
+        assertEquals("테스트 상품", response.name());
+        assertEquals(ProductCategory.FOOD, response.category());
+        assertEquals(10_000L, response.price());
+        assertEquals(5, response.stockQuantity());
+        assertEquals("테스트 상품 설명", response.description());
+        verify(productRepository).findById(productId);
+    }
+
+    @Test
+    void getProductDetailRejectsMissingProduct() {
+        Long productId = 1L;
+        when(productRepository.findById(productId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> productService.getProductDetail(productId)
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verify(productRepository).findById(productId);
+    }
+
+    @Test
+    void updateProductUpdatesAllProvidedFields() {
+        Long productId = 1L;
+        Product product = createProduct(
+                "기존 상품",
+                ProductCategory.FOOD,
+                10_000L,
+                "기존 설명"
+        );
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                "수정 상품",
+                ProductCategory.ELECTRONICS,
+                20_000L,
+                "수정 설명"
+        );
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.updateProduct(productId, request);
+
+        assertEquals("수정 상품", product.getName());
+        assertEquals(ProductCategory.ELECTRONICS, product.getCategory());
+        assertEquals(20_000L, product.getPrice());
+        assertEquals("수정 설명", product.getDescription());
+        assertEquals("수정 상품", response.name());
+        assertEquals(ProductCategory.ELECTRONICS, response.category());
+        assertEquals(20_000L, response.price());
+        assertEquals("수정 설명", response.description());
+        verify(productRepository).findById(productId);
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateProductUpdatesOnlyProvidedNameAndKeepsNullFields() {
+        Long productId = 1L;
+        Product product = createProduct(
+                "기존 상품",
+                ProductCategory.FOOD,
+                10_000L,
+                "기존 설명"
+        );
+        ProductUpdateRequest request = new ProductUpdateRequest("수정 상품", null, null, null);
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.updateProduct(productId, request);
+
+        assertEquals("수정 상품", product.getName());
+        assertEquals(ProductCategory.FOOD, product.getCategory());
+        assertEquals(10_000L, product.getPrice());
+        assertEquals("기존 설명", product.getDescription());
+        assertEquals("수정 상품", response.name());
+        assertEquals(ProductCategory.FOOD, response.category());
+        assertEquals(10_000L, response.price());
+        assertEquals("기존 설명", response.description());
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateProductUpdatesOnlyProvidedDescriptionAndKeepsNullFields() {
+        Long productId = 1L;
+        Product product = createProduct(
+                "기존 상품",
+                ProductCategory.FOOD,
+                10_000L,
+                "기존 설명"
+        );
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, "수정 설명");
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.updateProduct(productId, request);
+
+        assertEquals("기존 상품", product.getName());
+        assertEquals(ProductCategory.FOOD, product.getCategory());
+        assertEquals(10_000L, product.getPrice());
+        assertEquals("수정 설명", product.getDescription());
+        assertEquals("기존 상품", response.name());
+        assertEquals(ProductCategory.FOOD, response.category());
+        assertEquals(10_000L, response.price());
+        assertEquals("수정 설명", response.description());
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateProductRejectsMissingProduct() {
+        Long productId = 1L;
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                "수정 상품",
+                null,
+                null,
+                null
+        );
+        when(productRepository.findById(productId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> productService.updateProduct(productId, request)
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verify(productRepository).findById(productId);
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
     void productListRequestUsesDefaultPageAndSize() {
         ProductListRequest request = new ProductListRequest(null, null, null, null, null);
 
@@ -136,9 +282,73 @@ class ProductServiceTest {
         assertTrue(validate(request).isEmpty());
     }
 
-    private Set<ConstraintViolation<ProductListRequest>> validate(ProductListRequest request) {
+    @Test
+    void productUpdateRequestAllowsNameWith200Characters() {
+        ProductUpdateRequest request = new ProductUpdateRequest("가".repeat(200), null, null, null);
+
+        assertTrue(validate(request).isEmpty());
+    }
+
+    @Test
+    void productUpdateRequestRejectsNameOver200Characters() {
+        ProductUpdateRequest request = new ProductUpdateRequest("가".repeat(201), null, null, null);
+
+        Set<ConstraintViolation<ProductUpdateRequest>> violations = validate(request);
+
+        assertTrue(violations.stream()
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("name")));
+    }
+
+    @Test
+    void productUpdateRequestRejectsBlankName() {
+        ProductUpdateRequest request = new ProductUpdateRequest("   ", null, null, null);
+
+        Set<ConstraintViolation<ProductUpdateRequest>> violations = validate(request);
+
+        assertTrue(violations.stream()
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("name")));
+    }
+
+    @Test
+    void productUpdateRequestAllowsNullNameWhenAnotherFieldIsPresent() {
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null,
+                ProductCategory.FOOD,
+                null,
+                null
+        );
+
+        assertTrue(validate(request).isEmpty());
+    }
+
+    @Test
+    void productUpdateRequestRejectsEmptyPatch() {
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, null);
+
+        Set<ConstraintViolation<ProductUpdateRequest>> violations = validate(request);
+
+        assertTrue(violations.stream()
+                .anyMatch(violation -> violation.getPropertyPath().toString()
+                        .equals("anyFieldPresent")));
+    }
+
+    private <T> Set<ConstraintViolation<T>> validate(T request) {
         try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
             return validatorFactory.getValidator().validate(request);
         }
+    }
+
+    private Product createProduct(
+            String name,
+            ProductCategory category,
+            Long price,
+            String description
+    ) {
+        Product product = new TestProduct();
+        product.update(name, category, price, description);
+        return product;
+    }
+
+    private static class TestProduct extends Product {
     }
 }
