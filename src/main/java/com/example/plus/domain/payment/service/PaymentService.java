@@ -6,7 +6,7 @@ import com.example.plus.domain.payment.dto.PaymentResponse;
 import com.example.plus.domain.payment.entity.Payment;
 import com.example.plus.domain.payment.entity.PaymentStatus;
 import com.example.plus.domain.payment.repository.PaymentRepository;
-import com.example.plus.orders.entity.Order;
+import com.example.plus.domain.order.entity.Order;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +18,8 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
 
-    public PaymentResponse getPayment(Long customerId, Long paymentId) {
-        Payment payment = paymentRepository.findByIdAndCustomerId(paymentId, customerId)
+    public PaymentResponse getPayment(Long memberId, Long paymentId) {
+        Payment payment = paymentRepository.findByIdAndMemberId(paymentId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
 
         return new PaymentResponse(

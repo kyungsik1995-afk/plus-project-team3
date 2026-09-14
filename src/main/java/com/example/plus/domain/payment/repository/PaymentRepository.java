@@ -8,8 +8,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
-    @Query("SELECT p FROM Payment p WHERE p.id = :paymentId AND p.order.customer.id = :customerId")
-    Optional<Payment> findByIdAndCustomerId(@Param("paymentId") Long paymentId, @Param("customerId") Long customerId);
+    @Query("SELECT p FROM Payment p WHERE p.id = :paymentId AND p.order.member.id = :memberId")
+    Optional<Payment> findByIdAndMemberId(@Param("paymentId") Long paymentId, @Param("memberId") Long memberId);
 
     @Query("SELECT p FROM Payment p JOIN FETCH p.order o WHERE o.id = :orderId")
     Optional<Payment> findByOrderIdWithOrder(@Param("orderId") Long orderId);

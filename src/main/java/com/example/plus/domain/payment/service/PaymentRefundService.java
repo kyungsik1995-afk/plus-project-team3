@@ -1,21 +1,18 @@
 package com.example.plus.domain.payment.service;
 
+import com.example.plus.domain.payment.entity.*;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
 import com.example.plus.domain.payment.dto.RefundItemRequest;
 import com.example.plus.domain.payment.dto.RefundRequest;
 import com.example.plus.domain.payment.dto.RefundResponse;
-import com.example.plus.domain.payment.entity.Payment;
-import com.example.plus.domain.payment.entity.PaymentStatus;
-import com.example.plus.domain.payment.entity.Refund;
-import com.example.plus.domain.payment.entity.RefundItem;
 import com.example.plus.domain.payment.repository.PaymentRepository;
 import com.example.plus.domain.payment.repository.RefundItemRepository;
 import com.example.plus.domain.payment.repository.RefundRepository;
-import com.example.plus.orders.entity.Order;
-import com.example.plus.orders.entity.OrderItem;
-import com.example.plus.orders.repository.OrderItemRepository;
-import com.example.plus.products.entity.Product;
+import com.example.plus.domain.order.entity.Order;
+import com.example.plus.domain.order.entity.OrderItem;
+import com.example.plus.domain.order.repository.OrderItemRepository;
+import com.example.plus.domain.product.entity.Product;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +36,7 @@ public class PaymentRefundService {
 
     @Transactional
     public RefundResponse refund(Long paymentId, Long customerId, RefundRequest request) {
-        Payment payment = paymentRepository.findByIdAndCustomerId(paymentId, customerId)
+        Payment payment = paymentRepository.findByIdAndMemberId(paymentId, customerId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
 
         validatePaymentStatus(payment);
@@ -67,7 +64,8 @@ public class PaymentRefundService {
             List<OrderItem> orderItems,
             String reason
     ) {
-        long alreadyRefunded = refundRepository.sumRefundedAmount(payment.getId());
+        // 이미 성공 처리된 환불 금액을 조회한다.
+        long alreadyRefunded = refundRepository.sumRefundAmount(payment.getId(), RefundStatus.SUCCEED);
         long refundAmount = payment.getFinalPrice() - alreadyRefunded;
 
         if (refundAmount <= 0) {
@@ -83,14 +81,14 @@ public class PaymentRefundService {
         refundRepository.save(refund);
 
         for (OrderItem orderItem : orderItems) {
-            int refundedQuantity = refundItemRepository.sumRefundedQuantity(orderItem.getId());
+            int refundedQuantity = refundItemRepository.sumRefundedQuantity(orderItem.getId()).intValue();
             int remainingQuantity = orderItem.getQuantity() - refundedQuantity;
 
             if (remainingQuantity <= 0) {
                 continue;
             }
 
-            long itemRefundAmount = orderItem.getProductPrice() * remainingQuantity;
+            long itemRefundAmount = orderItem.getOrderPrice() * remainingQuantity;
             refundItemRepository.save(new RefundItem(
                     refund,
                     orderItem,
@@ -144,17 +142,18 @@ public class PaymentRefundService {
                 throw new BusinessException(ErrorCode.INVALID_REFUND_ITEM);
             }
 
-            int alreadyRefunded = refundItemRepository.sumRefundedQuantity(orderItem.getId());
+            int alreadyRefunded = refundItemRepository.sumRefundedQuantity(orderItem.getId()).intValue();
             int remainingQuantity = orderItem.getQuantity() - alreadyRefunded;
 
             if (itemRequest.quantity() > remainingQuantity) {
                 throw new BusinessException(ErrorCode.REFUND_QUANTITY_MISMATCH);
             }
 
-            totalRefundAmount += orderItem.getProductPrice() * itemRequest.quantity();
+            totalRefundAmount += orderItem.getOrderPrice() * itemRequest.quantity();
         }
 
-        long alreadyRefundedAmount = refundRepository.sumRefundedAmount(payment.getId());
+        // 기존에 성공 처리된 환불 금액을 조회한다.
+        long alreadyRefundedAmount = refundRepository.sumRefundAmount(payment.getId(), RefundStatus.SUCCEED);
         if (alreadyRefundedAmount + totalRefundAmount > payment.getFinalPrice()) {
             throw new BusinessException(ErrorCode.REFUND_AMOUNT_MISMATCH);
         }
@@ -169,7 +168,7 @@ public class PaymentRefundService {
 
         for (RefundItemRequest itemRequest : request.items()) {
             OrderItem orderItem = orderItemMap.get(itemRequest.orderItemId());
-            long itemRefundAmount = orderItem.getProductPrice() * itemRequest.quantity();
+            long itemRefundAmount = orderItem.getOrderPrice() * itemRequest.quantity();
 
             refundItemRepository.save(new RefundItem(
                     refund,

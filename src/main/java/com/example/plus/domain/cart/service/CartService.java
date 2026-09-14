@@ -41,6 +41,19 @@ public class CartService {
                 ));
     }
 
+    /**
+     * 주문 생성에 필요한 장바구니 상품을 조회한다.
+     *
+     * 장바구니가 존재하지 않으면 예외를 발생시킨다.
+     * 상품 정보도 함께 조회하여 주문 생성 시 사용할 수 있도록 한다.
+     */
+    public List<CartItem> getCartItems(Long memberId) {
+        Cart cart = cartRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CART_NOT_FOUND));
+
+        return cartItemRepository.findAllByCartWithProduct(cart);
+    }
+
     @Transactional
     public void deleteItem(Long memberId, Long cartItemId) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)

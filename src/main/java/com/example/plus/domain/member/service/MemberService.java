@@ -76,4 +76,18 @@ public class MemberService {
                 member.getPhoneNumber()
         );
     }
+
+    /**
+     * 회원 ID로 회원 엔티티를 조회한다.
+     *
+     * 다른 도메인에서 회원 정보가 필요할 때 사용한다.
+     */
+    @Transactional(readOnly = true)
+    public Member findById(Long memberId) {
+
+        return memberRepository.findById(memberId)
+                .orElseThrow(() ->
+                        new BusinessException(ErrorCode.MEMBER_NOT_FOUND)
+                );
+    }
 }

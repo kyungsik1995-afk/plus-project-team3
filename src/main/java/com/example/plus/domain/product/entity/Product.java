@@ -1,6 +1,8 @@
 package com.example.plus.domain.product.entity;
 
 import com.example.plus.global.common.entity.BaseEntity;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -57,5 +59,26 @@ public class Product extends BaseEntity {
         if (description != null) {
             this.description = description;
         }
+    }
+
+    public void decreaseStock(Integer quantity) {
+
+        if (stockQuantity < quantity) {
+            throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+        }
+
+        stockQuantity -= quantity;
+    }
+
+    // 환불된 상품의 수량만큼 재고를 다시 증가시킨다.
+    public void restoreStock(Integer quantity) {
+
+        // 재고 복구 수량이 올바른 값인지 확인한다.
+        if (quantity == null || quantity <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // 환불된 수량만큼 상품 재고를 복구한다.
+        stockQuantity += quantity;
     }
 }
