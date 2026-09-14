@@ -65,4 +65,16 @@ public class OrderController {
 
         return ApiResponse.success(orderService.toResponse(order));
     }
+
+    @PatchMapping("/{orderId}/cancel")
+    public ApiResponse<OrderResponse> cancelOrder(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long orderId
+    ) {
+        Order order = orderFacade.cancelOrder(memberId, orderId);
+
+        return ApiResponse.success(
+                orderService.toResponse(order)
+        );
+    }
 }
