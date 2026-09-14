@@ -2,6 +2,8 @@ package com.example.plus.domain.order.entity;
 
 import com.example.plus.domain.member.entity.Member;
 import com.example.plus.global.common.entity.BaseEntity;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -81,9 +83,8 @@ public class Order extends BaseEntity {
         // 결제 대기 또는 결제 완료 상태의 주문만 취소할 수 있다.
         if (status != OrderStatus.PAYMENT_PENDING
                 && status != OrderStatus.COMPLETED) {
-            throw new IllegalStateException("취소할 수 없는 주문 상태입니다.");
+            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
         }
-
         status = OrderStatus.CANCELED;
     }
 }
