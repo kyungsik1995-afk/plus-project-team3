@@ -3,9 +3,11 @@ package com.example.plus.domain.product.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.plus.domain.product.dto.ProductListResponse;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.entity.ProductCategory;
 import com.example.plus.global.config.jpa.JpaAuditingConfig;
+import com.example.plus.global.config.jpa.QueryDslConfig;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class})
 class ProductRepositoryTest {
 
     private static final Sort LATEST_SORT = Sort.by(Sort.Direction.DESC, "createdAt")
@@ -71,7 +73,7 @@ class ProductRepositoryTest {
 
     @Test
     void findAllByConditionsReturnsAllProductsWithoutFilters() {
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 null,
                 null,
                 null,
@@ -88,16 +90,16 @@ class ProductRepositoryTest {
                 .filter(product -> product.getCategory() == ProductCategory.FOOD)
                 .toList();
 
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 ProductCategory.FOOD,
                 null,
                 null,
                 PageRequest.of(0, LARGE_PAGE_SIZE)
         );
 
-        assertEquals(idsOf(expected), idsOf(result.getContent()));
+        assertEquals(productIdsOf(expected), responseIdsOf(result.getContent()));
         assertTrue(result.getContent().stream()
-                .allMatch(product -> product.getCategory() == ProductCategory.FOOD));
+                .allMatch(product -> product.category() == ProductCategory.FOOD));
     }
 
     @Test
@@ -106,16 +108,16 @@ class ProductRepositoryTest {
                 .filter(product -> product.getPrice() >= 5_000L)
                 .toList();
 
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 null,
                 5_000L,
                 null,
                 PageRequest.of(0, LARGE_PAGE_SIZE)
         );
 
-        assertEquals(idsOf(expected), idsOf(result.getContent()));
+        assertEquals(productIdsOf(expected), responseIdsOf(result.getContent()));
         assertTrue(result.getContent().stream()
-                .allMatch(product -> product.getPrice() >= 5_000L));
+                .allMatch(product -> product.price() >= 5_000L));
     }
 
     @Test
@@ -124,16 +126,16 @@ class ProductRepositoryTest {
                 .filter(product -> product.getPrice() <= 3_000L)
                 .toList();
 
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 null,
                 null,
                 3_000L,
                 PageRequest.of(0, LARGE_PAGE_SIZE)
         );
 
-        assertEquals(idsOf(expected), idsOf(result.getContent()));
+        assertEquals(productIdsOf(expected), responseIdsOf(result.getContent()));
         assertTrue(result.getContent().stream()
-                .allMatch(product -> product.getPrice() <= 3_000L));
+                .allMatch(product -> product.price() <= 3_000L));
     }
 
     @Test
@@ -144,23 +146,23 @@ class ProductRepositoryTest {
                 .filter(product -> product.getPrice() <= 5_000L)
                 .toList();
 
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 ProductCategory.FOOD,
                 2_000L,
                 5_000L,
                 PageRequest.of(0, LARGE_PAGE_SIZE)
         );
 
-        assertEquals(idsOf(expected), idsOf(result.getContent()));
+        assertEquals(productIdsOf(expected), responseIdsOf(result.getContent()));
         assertTrue(result.getContent().stream()
-                .allMatch(product -> product.getCategory() == ProductCategory.FOOD
-                        && product.getPrice() >= 2_000L
-                        && product.getPrice() <= 5_000L));
+                .allMatch(product -> product.category() == ProductCategory.FOOD
+                        && product.price() >= 2_000L
+                        && product.price() <= 5_000L));
     }
 
     @Test
     void findAllByConditionsReturnsEmptyPageWhenNoProductMatches() {
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 null,
                 Long.MAX_VALUE,
                 null,
@@ -173,7 +175,7 @@ class ProductRepositoryTest {
 
     @Test
     void findAllByConditionsAppliesCreatedAtAndIdDescendingSort() {
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 null,
                 null,
                 null,
@@ -188,7 +190,7 @@ class ProductRepositoryTest {
                         foodMiddle.getId(),
                         foodLow.getId()
                 ),
-                result.getContent().stream().map(Product::getId).toList()
+                result.getContent().stream().map(ProductListResponse::productId).toList()
         );
     }
 
@@ -198,7 +200,7 @@ class ProductRepositoryTest {
                 .map(Product::getId)
                 .toList();
 
-        Page<Product> result = productRepository.findAllByConditions(
+        Page<ProductListResponse> result = productRepository.findAllByConditions(
                 null,
                 null,
                 null,
@@ -209,7 +211,7 @@ class ProductRepositoryTest {
         assertEquals(2, result.getSize());
         assertEquals(allProductIds.size(), result.getTotalElements());
         assertEquals(allProductIds.subList(2, 4),
-                result.getContent().stream().map(Product::getId).toList());
+                result.getContent().stream().map(ProductListResponse::productId).toList());
     }
 
     private Product saveProduct(String name, ProductCategory category, Long price) {
@@ -230,9 +232,15 @@ class ProductRepositoryTest {
                 .executeUpdate();
     }
 
-    private Set<Long> idsOf(List<Product> products) {
+    private Set<Long> productIdsOf(List<Product> products) {
         return products.stream()
                 .map(Product::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private Set<Long> responseIdsOf(List<ProductListResponse> products) {
+        return products.stream()
+                .map(ProductListResponse::productId)
                 .collect(Collectors.toSet());
     }
 }
