@@ -33,12 +33,11 @@ public class ProductService {
         );
 
         return productRepository.findAllByConditions(
-                        request.category(),
-                        request.minPrice(),
-                        request.maxPrice(),
-                        pageRequest
-                )
-                .map(ProductListResponse::from);
+                request.category(),
+                request.minPrice(),
+                request.maxPrice(),
+                pageRequest
+        );
     }
 
     public ProductDetailResponse getProductDetail(Long productId) {
