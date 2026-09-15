@@ -8,7 +8,9 @@ import com.example.plus.domain.order.dto.OrderCheckoutRequest;
 import com.example.plus.domain.order.dto.OrderCheckoutResponse;
 import com.example.plus.domain.order.entity.Order;
 import com.example.plus.domain.order.entity.OrderItem;
+import com.example.plus.domain.order.entity.OrderStatus;
 import com.example.plus.domain.order.service.OrderService;
+import com.example.plus.domain.payment.entity.Payment;
 import com.example.plus.domain.payment.service.PaymentService;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.global.exception.ErrorCode;
@@ -114,5 +116,33 @@ public class OrderFacade {
                 order.getTotalAmount(),
                 order.getStatus().name()
         );
+    }
+
+    @Transactional
+    public Order cancelOrder(Long memberId, Long orderId) {
+        // 1. 본인의 주문인지 확인
+        Order order = orderService.findOrderEntity(memberId, orderId);
+
+        // 2. 주문에 연결된 결제 정보 조회
+        Payment payment = paymentService.findByOrderIdWithOrder(orderId);
+
+        // 3. 주문 상태에 따라 결제 상태 변경
+        if (order.getStatus() == OrderStatus.PAYMENT_PENDING) {
+            payment.markAsFailed();
+        } else if (order.getStatus() == OrderStatus.COMPLETED) {
+            payment.markAsCancelled();
+        }
+
+        // 4. 주문 취소
+        order.cancel();
+
+        // 5. 주문 상품의 재고 복구
+        order.getOrderItems().forEach(orderItem -> {
+            Product product = orderItem.getProduct();
+            product.restoreStock(orderItem.getQuantity());
+        });
+
+        // 6. 취소된 주문 반환
+        return order;
     }
 }

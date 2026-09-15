@@ -142,4 +142,26 @@ public class CartService {
             throw new BusinessException(ErrorCode.OUT_OF_STOCK);
         }
     }
+
+    /**
+     * 주문한 상품에 해당하는 장바구니 상품만 삭제한다.
+     *
+     * 결제 성공 시 주문에 포함된 상품만 장바구니에서 삭제하기 위해 사용한다.
+     * 주문하지 않은 다른 장바구니 상품은 그대로 유지한다.
+     */
+    @Transactional
+    public void deleteItemsByProductIds(Long memberId, List<Long> productIds) {
+        Cart cart = cartRepository.findByMember_Id(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CART_NOT_FOUND));
+
+        List<CartItem> cartItems = cartItemRepository.findAllByCartWithProduct(cart);
+
+        List<CartItem> itemsToDelete = cartItems.stream()
+                .filter(cartItem ->
+                        productIds.contains(cartItem.getProduct().getId())
+                )
+                .toList();
+
+        cartItemRepository.deleteAll(itemsToDelete);
+    }
 }
