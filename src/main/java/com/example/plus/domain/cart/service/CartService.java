@@ -10,6 +10,7 @@ import com.example.plus.domain.cart.repository.CartItemRepository;
 import com.example.plus.domain.cart.repository.CartRepository;
 import com.example.plus.domain.member.entity.Member;
 import com.example.plus.domain.member.repository.MemberRepository;
+import com.example.plus.domain.payment.service.PaymentService;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;

@@ -13,6 +13,7 @@ import com.example.plus.domain.order.service.OrderService;
 import com.example.plus.domain.payment.entity.Payment;
 import com.example.plus.domain.payment.service.PaymentService;
 import com.example.plus.domain.product.entity.Product;
+import com.example.plus.domain.product.service.ProductService;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class OrderFacade {
     private final MemberService memberService;
     private final CartService cartService;
     private final PaymentService paymentService;
+    private final ProductService productService;
 
     @Transactional
     public OrderCheckoutResponse createOrder(
@@ -73,10 +75,20 @@ public class OrderFacade {
         // 5. 장바구니 상품을 OrderItem으로 변환하면서 재고 차감
         List<OrderItem> orderItems = orderCartItems.stream()
                 .map(cartItem -> {
-                    Product product = cartItem.getProduct();
+//                    Product product = cartItem.getProduct();
+//
+
+                    //장바구니에 들어있는 상품에 비관적 락을 적용
+                    Product product = productService.findByIdWithLock(
+                            cartItem.getProduct().getId()
+                    );
 
                     // 재고가 부족하면 BusinessException이 발생하고
                     // @Transactional에 의해 지금까지의 변경도 함께 롤백된다.
+                    product.decreaseStock(cartItem.getQuantity());
+
+
+
                     product.decreaseStock(cartItem.getQuantity());
 
                     // 주문 당시 상품명과 가격을 스냅샷으로 저장한다.

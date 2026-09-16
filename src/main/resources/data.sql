@@ -1,3 +1,4 @@
+
 INSERT INTO products (name, category, price, stock_quantity, description, created_at, updated_at)
 SELECT '사과', 'FOOD', 100, 1, '사과 테스트 상품', '2026-08-01 09:00:00', '2026-08-01 09:00:00'
 WHERE NOT EXISTS (

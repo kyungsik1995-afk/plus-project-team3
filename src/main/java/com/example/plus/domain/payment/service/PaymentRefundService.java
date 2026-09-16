@@ -1,6 +1,7 @@
 package com.example.plus.domain.payment.service;
 
 import com.example.plus.domain.payment.entity.*;
+import com.example.plus.domain.product.service.ProductService;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
 import com.example.plus.domain.payment.dto.RefundItemRequest;
@@ -33,6 +34,7 @@ public class PaymentRefundService {
     private final OrderItemRepository orderItemRepository;
     private final RefundRepository refundRepository;
     private final RefundItemRepository refundItemRepository;
+    private final ProductService productService;
 
     @Transactional
     public RefundResponse refund(Long paymentId, Long customerId, RefundRequest request) {
@@ -96,7 +98,14 @@ public class PaymentRefundService {
                     itemRefundAmount
             ));
 
-            Product product = orderItem.getProduct();
+            //비관적 락 적용 전 코드
+//            Product product = orderItem.getProduct();
+
+            //product에 비관적 락 적용
+            Product product = productService.findByIdWithLock(
+                    orderItem.getProduct().getId()
+            );
+
             product.restoreStock(remainingQuantity);
         }
 
@@ -177,7 +186,15 @@ public class PaymentRefundService {
                     itemRefundAmount
             ));
 
-            orderItem.getProduct().restoreStock(itemRequest.quantity());
+            //비관적 락 적용 전 코드
+//            orderItem.getProduct().restoreStock(itemRequest.quantity());
+
+            //비관적 락 적용
+            Product product = productService.findByIdWithLock(
+                    orderItem.getProduct().getId()
+            );
+
+            product.restoreStock(itemRequest.quantity());
         }
 
         long totalRefunded = alreadyRefundedAmount + totalRefundAmount;
