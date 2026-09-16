@@ -3,6 +3,7 @@ package com.example.plus.domain.product.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.plus.domain.product.dto.ProductCacheListResponse;
 import com.example.plus.domain.product.dto.ProductListResponse;
 import com.example.plus.domain.product.entity.Product;
 import com.example.plus.domain.product.entity.ProductCategory;
@@ -11,6 +12,7 @@ import com.example.plus.global.config.jpa.QueryDslConfig;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -212,6 +214,39 @@ class ProductRepositoryTest {
         assertEquals(allProductIds.size(), result.getTotalElements());
         assertEquals(allProductIds.subList(2, 4),
                 result.getContent().stream().map(ProductListResponse::productId).toList());
+    }
+
+    @Test
+    void findAllCachedByConditionsUsesSameFiltersAndExcludesStockFromResponse() {
+        List<Product> expected = productRepository.findAll(LATEST_SORT).stream()
+                .filter(product -> product.getCategory() == ProductCategory.FOOD)
+                .filter(product -> product.getPrice() >= 2_000L)
+                .filter(product -> product.getPrice() <= 5_000L)
+                .toList();
+
+        Page<ProductCacheListResponse> result = productRepository.findAllCachedByConditions(
+                ProductCategory.FOOD,
+                2_000L,
+                5_000L,
+                PageRequest.of(0, LARGE_PAGE_SIZE, LATEST_SORT)
+        );
+
+        assertEquals(productIdsOf(expected), result.getContent().stream()
+                .map(ProductCacheListResponse::productId)
+                .collect(Collectors.toSet()));
+        assertEquals(expected.size(), result.getTotalElements());
+    }
+
+    @Test
+    void findStockQuantitiesByProductIdsReturnsStocksWithOneBulkQuery() {
+        Map<Long, Integer> result = productRepository.findStockQuantitiesByProductIds(
+                List.of(foodLow.getId(), electronicsHigh.getId())
+        );
+
+        assertEquals(Map.of(
+                foodLow.getId(), foodLow.getStockQuantity(),
+                electronicsHigh.getId(), electronicsHigh.getStockQuantity()
+        ), result);
     }
 
     private Product saveProduct(String name, ProductCategory category, Long price) {
