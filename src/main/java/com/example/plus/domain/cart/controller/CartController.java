@@ -61,10 +61,7 @@ public class CartController {
             BindingResult bindingResult,
             @AuthenticationPrincipal Long memberId
     ) {
-        if (bindingResult.hasErrors()) {
-            String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, message);
-        }
+        validateRequest(bindingResult);
 
         return ApiResponse.success(
                 cartService.updateItemQuantity(memberId, cartItemId, request)
@@ -77,11 +74,15 @@ public class CartController {
             BindingResult bindingResult,
             @AuthenticationPrincipal Long memberId
     ) {
+        validateRequest(bindingResult);
+
+        return ApiResponse.success(cartService.addItem(memberId, request));
+    }
+
+    private void validateRequest(BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
             String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
             throw new BusinessException(ErrorCode.INVALID_REQUEST, message);
         }
-
-        return ApiResponse.success(cartService.addItem(memberId, request));
     }
 }
