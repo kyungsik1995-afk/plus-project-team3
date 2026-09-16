@@ -9,6 +9,7 @@ import com.example.plus.domain.product.repository.ProductRepository;
 import com.example.plus.global.exception.ErrorCode;
 import com.example.plus.global.exception.business.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -18,9 +19,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ProductService {
 
     private final ProductRepository productRepository;
+
+    @Transactional
+    public Product findByIdWithLock(Long productId) {
+        log.info("Product Service의 락 발생");
+        return productRepository.findByIdWithLock(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+    }
 
     public Page<ProductListResponse> getProducts(ProductListRequest request) {
         validatePriceRange(request.minPrice(), request.maxPrice());
