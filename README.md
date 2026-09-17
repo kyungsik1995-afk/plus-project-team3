@@ -1,77 +1,103 @@
-# 🛒 Plus Project Team 3
+# 🛒 커머스 결제 시스템 재도전 프로젝트
 
-Spring Boot 기반의 **커머스 결제 시스템** 팀 프로젝트입니다.
+> 상품 조회부터 장바구니, 주문, 모의 결제, 취소까지의 커머스 핵심 흐름을 구현하고, QueryDSL·인덱스·로컬 캐시·동시성 제어를 적용한 Java/Spring 팀 프로젝트입니다.
 
-회원, 상품, 장바구니, 주문, 결제 기능을 구현하고,
-대용량 데이터와 실제 서비스에서 발생할 수 있는 **조회 성능, 캐시, 동시성 문제**를 고려하여 QueryDSL, Index, Cache, 동시성 제어를 적용했습니다.
+이 프로젝트는 **주문·결제·재고가 어떤 흐름으로 변경되는지 설명할 수 있는 구조**와 **데이터 정합성**에 집중했습니다.
 
----
+기본 커머스 흐름을 완성한 뒤 다음 네 가지 심화 주제를 적용했습니다.
 
-## 👥 팀원 및 역할
+- QueryDSL을 이용한 상품 동적 조회
+- 인덱스와 실행 계획을 이용한 조회 성능 분석
+- Caffeine Local Cache를 이용한 반복 조회 비용 절감
+- 재고 차감 과정의 동시성 제어
 
-| 이름      | 담당 도메인   | CH5 프로젝트 |
-| ------- | -------- | --------- |
-| **임경식** | 주문       | Index     |
-| **강성현** | 상품, 장바구니 | Cache     |
-| **이건희** | 회원, 인증   | QueryDSL  |
-| **이상민** | 결제       | 동시성 제어    |
-
-각 팀원은 담당 도메인의 기능을 구현하고, CH5에서는 담당한 심화 과제를 진행하여 기능 구현과 성능 및 안정성 개선을 함께 경험했습니다.
+또한 React/Vite 기반의 시연 화면을 만들어 실제 Backend API를 호출하고, HTTP 요청·응답과 주요 비즈니스 시나리오를 확인할 수 있도록 구성했습니다.
 
 ---
 
-# 📌 프로젝트 개요
+## 목차
 
-| 항목       | 내용                          |
-| -------- | --------------------------- |
-| 프로젝트     | Plus Project Team 3         |
-| 개발 인원    | 4명                          |
-| Backend  | Java 17 / Spring Boot 4.1.1 |
-| Database | MySQL 8                     |
-| Build    | Gradle                      |
-| 주요 목표    | 커머스 결제 시스템 구현 및 성능·동시성 개선   |
-
-### 프로젝트 목표
-
-기본적인 커머스 기능 구현을 넘어 다음과 같은 상황을 고려했습니다.
-
-* 다양한 조건의 상품 검색
-* 대량 상품 데이터에서의 조회 성능
-* 반복적인 상품 목록 조회에 대한 DB 부하
-* 동시에 발생하는 재고 차감 및 복구
-* 결제 금액 변조 방지
-* 주문과 결제 상태의 일관성
-* 환불에 따른 재고 복구
-* 테스트 환경과 개발 환경의 데이터 분리
+1. [프로젝트 소개](#1-프로젝트-소개)
+2. [팀 구성과 역할](#2-팀-구성과-역할)
+3. [기술 스택](#3-기술-스택)
+4. [프로젝트 구조](#4-프로젝트-구조)
+5. [서비스 흐름](#5-서비스-흐름)
+6. [ERD](#6-erd)
+7. [주요 기능](#7-주요-기능)
+8. [핵심 기술 적용](#8-핵심-기술-적용)
+9. [API](#9-api)
+10. [Git 협업](#10-Git-협업)
+11. [실행 방법](#11-실행-방법)
+12. [프로젝트 정리](#12-프로젝트-정리)
 
 ---
 
-# 🛠️ 기술 스택
+## 1. 프로젝트 소개
 
-### Backend
+### 프로젝트 배경
 
-* Java 17
-* Spring Boot 4.1.1
-* Spring MVC
-* Spring Data JPA
-* Spring Security
-* JWT
-* QueryDSL 5.1.0
+상품 → 장바구니 → 주문 → 결제 → 취소로 이어지는 커머스의 기본 흐름을 직접 설계하고 구현했습니다.
 
-### Database / Cache
+단순 CRUD에 머무르지 않고 다음 질문을 코드와 테스트로 확인하는 것을 목표로 했습니다.
 
-* MySQL 8
-* Caffeine Cache
+### 핵심 범위
 
-### Build / Test
+- Spring Security + JWT 기반 인증
+- 상품 조건 조회와 페이지네이션
+- 회원별 장바구니 관리와 소유권 검증
+- 주문 생성 시 재고 선차감
+- 주문 시점의 상품명·가격 스냅샷 저장
+- 모의 결제 승인
+- 결제 전·후 주문 취소와 재고 복구
+- QueryDSL, Index, Local Cache, Concurrency Control 적용
 
-* Gradle
-* JUnit
-* Spring Boot Test
+
+### 공식 데이터 모델
+
+공식 ERD는 다음 7개 테이블로 구성됩니다.
+
+`members`, `products`, `carts`, `cart_items`, `orders`, `order_items`, `payments`
+
+환불 관련 코드는 확장 구현으로 존재할 수 있지만 공식 ERD와 핵심 발표 범위에서는 제외했습니다.
 
 ---
 
-# 📂 프로젝트 구조
+## 2. 팀 구성과 역할
+
+| 담당자 | 담당 영역 |
+| --- | --- |
+| 이건희 | Member, 인증/JWT |
+| 강성현 | Product, Cart, Product QueryDSL 통합, Caffeine Cache, Frontend 통합 시연 |
+| 임경식 | Order |
+| 이상민 | Payment |
+
+---
+
+## 3. 기술 스택
+
+| 구분 | 기술 |
+| --- | --- |
+| Backend | Java, Spring Boot, Spring MVC |
+| Persistence | Spring Data JPA, Hibernate, QueryDSL |
+| Database | MySQL |
+| Authentication | Spring Security, JWT, BCrypt |
+| Validation | Jakarta Bean Validation |
+| Cache | Spring Cache, Caffeine |
+| Build | Gradle |
+| Frontend | React, Vite 7.3.6, pnpm |
+| Test | JUnit 5, Mockito, Spring Boot Test |
+| Collaboration | Git, GitHub, Pull Request |
+
+### 기술 선택 이유
+
+- **Spring Data JPA**: 엔티티 관계와 트랜잭션 단위의 상태 변경을 관리했습니다.
+- **QueryDSL**: 카테고리·최소 가격·최대 가격처럼 선택적인 조건을 타입 안전한 동적 쿼리로 조합했습니다.
+- **MySQL**: 실제 인덱스 실행 계획과 DB 락을 검증하기 위해 사용했습니다.
+- **Caffeine**: 단일 애플리케이션 환경에서 외부 인프라 없이 로컬 캐시의 효과와 한계를 학습하기 위해 선택했습니다.
+- **React/Vite**: Postman만으로는 한눈에 보기 어려운 회원가입→결제 흐름을 실제 사용자 시나리오로 시연하기 위해 사용했습니다.
+
+---
+## 4. 프로젝트 구조
 
 ```text
 com.example.plus
@@ -129,305 +155,161 @@ com.example.plus
 
 도메인별로 Controller, Service, Repository, Entity, DTO를 분리했습니다.
 
-주문과 결제처럼 여러 도메인의 흐름을 조합해야 하는 기능에는 Facade를 사용했습니다.
+주문과 결제처럼 여러 도메인의 흐름을 조합해야 하는 기능에는 Facade를 사용했습니다
 
----
+## 5. 서비스 흐름
 
-# 👤 5. 회원 / 인증
+![플로우 차트.jpg](./img/flow.jpg)
 
-**담당: 이건희**
+### 주문 생성
 
-회원 도메인과 인증 기능을 담당하여 사용자의 회원가입 및 로그인부터 JWT 기반 인증까지 구현했습니다.
+1. JWT에서 로그인 회원 ID를 확인합니다.
+2. 회원의 장바구니 또는 선택된 장바구니 상품을 조회합니다.
+3. 상품 재고를 검증합니다.
+4. 주문 시점의 상품명·가격·수량을 `OrderItem`에 스냅샷으로 저장합니다.
+5. 상품 재고를 선차감합니다.
+6. 결제 대기 상태의 Payment를 생성합니다.
+7. 주문을 결제 대기 상태로 저장합니다.
 
-### 주요 기능
+### 결제 승인
 
-* 회원가입
-* 로그인
-* 비밀번호 암호화
-* JWT 발급
-* JWT 인증
-* 인증 사용자 식별
-* 권한 검증
-
-### 인증 흐름
-
-```text
-로그인
-  ↓
-회원 정보 확인
-  ↓
-JWT 발급
-  ↓
-Client
-  ↓
-Authorization Header
-  ↓
-JwtAuthenticationFilter
-  ↓
-JWT 검증
-  ↓
-인증 사용자 설정
-  ↓
-Controller 접근
-```
-
-인증이 필요한 API에서는 JWT를 검증하여 현재 요청을 보낸 사용자를 식별하도록 구성했습니다.
-
-또한 다른 사용자의 주문이나 장바구니 등에 접근하지 못하도록 사용자 소유권을 검증했습니다.
-
----
-
-# 📦 6. 상품 / 장바구니
-
-**담당: 강성현**
-
-상품과 장바구니 도메인을 담당하여 상품 관리부터 주문을 위한 장바구니 기능까지 구현했습니다.
-
-## 상품
-
-### 주요 기능
-
-* 상품 목록 조회
-* 카테고리 검색
-* 가격 범위 검색
-* 페이징
-* 상품 상세 조회
-* 상품 수정
-* 재고 관리
-
-상품 목록에서는 카테고리와 가격 범위를 이용한 검색 조건을 제공하고, 페이징을 통해 필요한 데이터만 조회하도록 구성했습니다.
-
-## 장바구니
-
-### 주요 기능
-
-* 장바구니 상품 추가
-* 수량 수정
-* 장바구니 상품 삭제
-* 장바구니 조회
-* 주문 상품의 장바구니 삭제
-
-결제 완료 시 주문한 상품만 장바구니에서 삭제하고, 주문하지 않은 상품은 그대로 유지하도록 구성했습니다.
-
-### 상품 → 장바구니 → 주문 흐름
-
-```text
-상품 조회
-   ↓
-장바구니 상품 추가
-   ↓
-장바구니 조회
-   ↓
-주문할 상품 선택
-   ↓
-주문 생성
-```
-
----
-
-# 🧾 7. 주문
-
-**담당: 임경식**
-
-주문 도메인을 담당하여 장바구니 상품을 실제 주문으로 전환하고 주문 상태 및 주문 상품 정보를 관리하도록 구현했습니다.
-
-### 주요 기능
-
-* 주문 생성
-* 주문 목록 조회
-* 주문 상세 조회
-* 주문 취소
-* 주문 당시 상품명 및 가격 저장
-* 주문 상태 관리
-* 주문 생성 시 재고 차감
-* 주문 취소 시 재고 복구
-
-### 주문 생성 흐름
-
-```text
-회원 확인
-   ↓
-장바구니 조회
-   ↓
-주문 상품 선택
-   ↓
-상품 및 재고 확인
-   ↓
-재고 차감
-   ↓
-OrderItem 생성
-   ↓
-주문 금액 계산
-   ↓
-Order 생성
-   ↓
-Payment 생성
-```
-
-주문 생성 직후에는 결제가 완료되지 않은 상태이므로 다음 상태로 관리합니다.
-
-```text
-Order   = PAYMENT_PENDING
-Payment = PENDING
-```
-
-### 주문 가격 스냅샷
-
-주문 생성 당시의 상품명과 가격을 `OrderItem`에 저장합니다.
-
-```text
-현재 상품 가격
-      ↓
-주문 생성
-      ↓
-OrderItem에 주문 당시 가격 저장
-```
-
-이후 상품 가격이 변경되더라도 기존 주문의 가격에는 영향을 주지 않도록 했습니다.
+1. 주문과 결제 소유권 및 현재 상태를 확인합니다.
+2. 서버가 보관한 주문 금액과 결제 금액을 비교합니다.
+3. Payment를 결제 완료 상태로 변경합니다.
+4. Order를 주문 완료 상태로 변경합니다.
+5. 주문된 상품을 장바구니에서 제거합니다.
 
 ### 주문 취소
 
-```text
-PAYMENT_PENDING ──→ CANCELED
-COMPLETED ─────────→ CANCELED
-```
-
-주문 취소 시 주문 수량만큼 재고를 복구하고, 결제가 완료된 주문이라면 결제 취소 흐름과 연계하도록 구성했습니다.
+- 결제 전 취소: Payment를 실패 상태로, Order를 취소 상태로 변경하고 선차감 재고를 복구합니다.
+- 결제 후 취소: Payment를 취소 상태로, Order를 취소 상태로 변경하고 재고를 복구합니다.
+- 상태 변경과 재고 복구는 하나의 트랜잭션 안에서 처리합니다.
 
 ---
 
-# 💳 8. 결제
+## 6. ERD
 
-**담당: 이상민**
+![erd.png](./img/erd.png)
 
-결제 도메인을 담당하여 주문 생성 이후의 결제 승인부터 결제 취소 및 환불까지 구현했습니다.
+### 주요 관계
 
-### 주요 기능
+| 관계 | 설명 |
+| --- | --- |
+| Member 1 : 1 Cart | 회원은 하나의 장바구니를 사용합니다. |
+| Member 1 : N Order | 회원은 여러 주문을 생성할 수 있습니다. |
+| Cart 1 : N CartItem | 하나의 장바구니에 여러 상품을 담을 수 있습니다. |
+| Product 1 : N CartItem | 하나의 상품이 여러 장바구니에서 참조될 수 있습니다. |
+| Order 1 : N OrderItem | 하나의 주문은 여러 주문 상품으로 구성됩니다. |
+| Product 1 : N OrderItem | 주문 상품은 원본 상품을 참조하면서 스냅샷도 저장합니다. |
+| Order 1 : 1 Payment | 하나의 주문에는 하나의 결제 정보가 연결됩니다. |
 
-* 결제 생성
-* 결제 승인
-* 결제 금액 검증
-* 결제 상태 관리
-* 결제 취소
-* 전체 환불
-* 부분 환불
+### 핵심 제약과 설계
 
-### 결제 승인 흐름
-
-```text
-Payment 조회
-      ↓
-결제 금액 검증
-      ↓
-Payment 승인
-      ↓
-Order 완료
-      ↓
-주문 상품 장바구니 삭제
-```
-
-결제 승인 시 주문 금액과 결제 금액을 검증하여 클라이언트에서 전달한 금액을 그대로 신뢰하지 않도록 했습니다.
-
-### 결제 상태
-
-```text
-PENDING
-   ↓
-PAID
-   ↓
-PART_CANCELLED
-   ↓
-CANCELLED
-```
-
-실제 상태 전이는 결제 및 환불 상황에 따라 처리합니다.
-
-### 전체 환불
-
-전체 환불 시 환불 금액과 기존 환불 내역을 확인하고, 주문 상품의 환불 수량만큼 재고를 복구합니다.
-
-### 부분 환불
-
-부분 환불에서는 다음 사항을 검증합니다.
-
-* 환불 대상 상품 존재 여부
-* 환불 수량
-* 이미 환불된 수량
-* 잔여 수량 초과 여부
-* 환불 금액
-* 누적 환불 금액 초과 여부
-
-부분 환불이 남아 있는 경우 결제 상태를 `PART_CANCELLED`로 관리하고, 전체 환불이 완료되면 결제를 취소 상태로 변경합니다.
+- `carts.member_id` UNIQUE: 회원당 Cart 1개
+- `cart_items(cart_id, product_id)` UNIQUE: 동일 Cart 안의 동일 상품 중복 행 방지
+- 동일 상품을 다시 담으면 새 행을 만들지 않고 수량을 합산
+- `OrderItem`에 상품명·주문 가격·수량을 저장하여 이후 상품 정보가 바뀌어도 주문 당시 정보를 유지
+- 장바구니 전체 비우기 시 Cart 엔티티는 유지하고 CartItem만 삭제
 
 ---
 
-# ⚡ 9. QueryDSL 동적 쿼리
+## 7. 주요 기능
 
-**담당: 이건희**
+### 7.1 회원과 인증
 
-상품 목록 조회에서 여러 검색 조건을 동적으로 처리하기 위해 QueryDSL을 적용했습니다.
+- 이메일·비밀번호 기반 회원가입과 로그인
+- 로그인 성공 시 JWT 발급
+- 인증 API에서 JWT principal의 회원 ID 사용
+- 클라이언트가 `memberId`를 요청 값으로 직접 전달하지 않음
+- 본인의 장바구니·주문·결제 자원만 접근할 수 있도록 소유권 검증
 
-### 적용 조건
+### 7.2 상품
 
-* 카테고리
-* 최소 가격
-* 최대 가격
+- 카테고리, 최소 가격, 최대 가격을 조합한 목록 조회
+- 페이지네이션과 최신순 정렬
+- 상품 상세 조회
+- 상품명·카테고리·가격·설명 부분 수정
+- 상품 목록 조회 v1과 캐시 조회 v2 병행
+- 상품 수정 성공 시 상품 목록 캐시 전체 무효화
 
-각 조건이 전달되지 않은 경우 해당 조건을 제외하도록 동적으로 구성했습니다.
 
-```java
-private BooleanExpression categoryEq(ProductCategory category) {
-    return category == null ? null : product.category.eq(category);
-}
+### 7.3 장바구니
 
-private BooleanExpression priceGoe(Long minPrice) {
-    return minPrice == null ? null : product.price.goe(minPrice);
-}
+- 상품 추가
+- 같은 상품 재추가 시 수량 합산
+- 장바구니 목록과 총액 조회
+- 수량을 최종 값으로 변경
+- 상품 개별 삭제
+- 장바구니 전체 비우기
+- 재고 초과 요청 거절
+- 다른 회원의 CartItem 접근 차단
+- Cart가 없는 회원 조회 시 `200 OK`와 빈 장바구니 반환
 
-private BooleanExpression priceLoe(Long maxPrice) {
-    return maxPrice == null ? null : product.price.loe(maxPrice);
+**장바구니 단계에서는 재고를 차감하지 않습니다. 실제 재고 변경은 주문 생성 단계에서 수행합니다.**
+
+### 7.4 주문
+
+- 장바구니 상품을 이용한 주문 생성
+- 주문 시 상품 정보 스냅샷 저장
+- 주문 목록과 상세 조회
+- 주문 생성 시 재고 선차감
+- 결제 전·후 주문 취소와 재고 복구
+
+### 7.5 결제
+
+- 주문 생성 시 결제 대기 데이터 생성
+- 모의 결제 승인
+- 결제 금액과 주문 금액 검증
+- 결제와 주문 상태 변경
+- 중복 승인 방지
+- 결제 완료 후 주문 상품의 장바구니 후처리
+
+### 7.6 공통 처리
+
+- DTO Validation
+- `BusinessException`, `ErrorCode`, `GlobalExceptionHandler` 기반 공통 예외 처리
+- 공통 성공 응답과 실패 응답
+- 트랜잭션 단위의 주문·결제·재고 상태 변경
+
+실패 응답 예시:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PRODUCT_001",
+    "message": "상품을 찾을 수 없습니다."
+  }
 }
 ```
-
-### Repository 구조
-
-```text
-ProductRepository
-        │
-        └── ProductRepositoryCustom
-                    │
-                    ▼
-          ProductRepositoryImpl
-                    │
-                    ▼
-             JPAQueryFactory
-                    │
-                    ▼
-                 QueryDSL
-```
-
-### 페이징 및 정렬
-
-```java
-.orderBy(
-    product.createdAt.desc(),
-    product.id.desc()
-)
-.offset(pageable.getOffset())
-.limit(pageable.getPageSize())
-```
-
-QueryDSL을 통해 검색 조건, 정렬, 페이징을 하나의 동적 쿼리로 구성했습니다.
 
 ---
 
-# 📈 10. Index 성능 개선
+## 8. 핵심 기술 적용
 
-**담당: 임경식**
+### 8.1 QueryDSL 동적 쿼리
 
-대량의 상품 데이터에서 상품 목록 조회 성능을 확인하고, `EXPLAIN`과 `EXPLAIN ANALYZE`를 활용하여 Index 설계에 따른 실행 계획과 성능을 비교했습니다.
+#### 문제
 
-## 테스트 데이터
+상품 목록은 `category`, `minPrice`, `maxPrice`가 모두 선택값입니다. 조건 조합마다 Repository 메서드를 만들면 중복이 증가하고 변경에 취약해집니다.
+
+#### 적용
+
+- Product Custom Repository에서 동적 조건 구성
+- 값이 없는 조건은 `where`절에서 제외
+- 목록에 필요한 필드만 DTO로 조회
+- content query와 count query 분리
+- `page`, `size`를 적용해 `Page` 결과 반환
+
+#### 결과
+
+필터 없음부터 세 필터 전체 조합까지 하나의 조회 메서드로 처리하고, 기존 Product 목록 API의 외부 계약을 유지했습니다.
+
+### 8.2 Index와 Query Tuning
+
+상품 목록의 카테고리·가격 범위·정렬 조건을 대상으로 인덱스를 검토했습니다. 소량의 기본 데이터만으로 결론을 내리지 않고, 대량 데이터와 `EXPLAIN` 또는 `EXPLAIN ANALYZE`의 실행 계획을 기준으로 비교합니다.
+
+### 테스트 데이터
 
 상품 테이블에 **150,006건**의 데이터를 생성했습니다.
 
@@ -437,7 +319,7 @@ FASHION     : 50,001
 FOOD        : 49,998
 ```
 
-## 테스트 쿼리
+### 테스트 쿼리
 
 ```sql
 SELECT id, name, category, price, stock_quantity
@@ -447,8 +329,7 @@ WHERE category = 'ELECTRONICS'
 ORDER BY created_at DESC, id DESC
 LIMIT 20;
 ```
-
-## 비교한 Index
+### 비교한 Index
 
 ### `(category, price)`
 
@@ -464,7 +345,7 @@ CREATE INDEX idx_products_category_created_at
 ON products (category, created_at);
 ```
 
-## 실행 계획 비교
+### 실행 계획 비교
 
 Index가 없는 상태에서는:
 
@@ -510,242 +391,93 @@ Extra = Using where; Using filesort
 
 ---
 
-# 💾 11. Cache 성능 개선
+### 8.3 Caffeine Local Cache
 
-**담당: 강성현**
+#### 문제
 
-반복적인 상품 목록 조회에서 발생하는 DB 접근을 줄이기 위해 **Caffeine Cache**를 적용했습니다.
+동일 조건의 상품 목록을 반복 조회할 때 QueryDSL content query와 count query가 매번 실행됩니다. 반면 상품 재고는 주문에 따라 자주 바뀌기 때문에 오래된 값을 반환해서는 안 됩니다.
 
-## Cache 설정
+#### 설계
 
-```text
-Cache Name   : productListCache
-Maximum Size : 500
-Expiration   : 5 minutes
-Statistics   : recordStats()
-Null Value   : disabled
-```
+| 구분 | 처리 방식 |
+| --- | --- |
+| 상품명·카테고리·가격 | Caffeine에 캐시 |
+| 재고 수량 | 매 요청 DB bulk 조회 |
+| v1 | `GET /api/products` — 캐시 미적용 |
+| v2 | `GET /api/v2/products` — QueryDSL + Caffeine |
+| Cache name | `productListCache` |
+| maximumSize | 500 |
+| TTL | 5분 |
+| 상품 수정 | 관련 목록 캐시 전체 eviction |
 
-### 적용 API
-
-일반 상품 목록 조회:
-
-```text
-GET /api/products
-```
-
-캐시 적용 상품 목록 조회:
+MISS:
 
 ```text
-GET /api/v2/products
+QueryDSL 정적 상품 조회 + count query
+→ 캐시 저장
+→ 최신 재고 bulk 조회
+→ 최종 응답 조립
 ```
 
-### 캐시 구조
+HIT:
 
 ```text
-GET /api/v2/products
-        ↓
-Caffeine Cache
-   ├── Hit
-   │    ↓
-   │  캐시 데이터 사용
-   │
-   └── Miss
-        ↓
-      DB 조회
-        ↓
-      Cache 저장
-        ↓
-상품 ID 목록 추출
-        ↓
-DB에서 최신 재고 조회
-        ↓
-최종 응답
+캐시에서 정적 상품 조회
+→ 최신 재고 bulk 조회
+→ 최종 응답 조립
 ```
 
-### 캐시 대상
+따라서 캐시 HIT에서도 최신 재고를 읽기 위한 SQL은 실행됩니다. 캐시 정상 동작 여부는 단일 응답 시간만이 아니라 SQL 로그, 반복 측정, 테스트를 함께 사용해 판단했습니다.
 
-캐시에는 상품의 변경 빈도와 조회 특성을 고려하여 다음 정보를 저장합니다.
+#### 선택의 한계
+
+Caffeine은 애플리케이션 인스턴스별 로컬 캐시입니다. 서버가 여러 대라면 캐시가 공유되지 않으므로, Redis 같은 원격 캐시를 별도로 검토해야 합니다.
+
+### 8.4 Concurrency Control
+
+재고가 한정된 상품에 주문이 동시에 들어오면 조회 시점과 수정 시점 사이에 경쟁이 발생할 수 있습니다. 재고 차감 경로에 락을 적용하고 다음 불변식을 기준으로 검증합니다.
 
 ```text
-productId
-name
-category
-price
+성공 주문 수 ≤ 최초 재고
+최종 재고 = 최초 재고 - 성공 주문 수
 ```
 
-재고는 캐시하지 않고 DB에서 최신 값을 조회하도록 구성했습니다.
-
-이를 통해 상품 정보는 캐시를 통해 반복 조회를 줄이고, 재고는 최신 상태를 조회할 수 있도록 분리했습니다.
-
-### Cache 무효화
-
-상품 정보가 수정되면 상품 목록 캐시를 전체 무효화합니다.
-
-```java
-@CacheEvict(
-    cacheNames = PRODUCT_LIST_CACHE,
-    allEntries = true
-)
-```
-
-이를 통해 상품 수정 후 이전 상품 정보가 캐시에 남아 있는 문제를 방지했습니다.
+| 방식 | 장점 | 단점 | 적합한 상황 |
+| --- | --- | --- | --- |
+| 낙관적 락 | 락 대기가 적음 | 충돌 시 재시도 필요 | 충돌이 드문 경우 |
+| 비관적 락 | 충돌이 잦을 때 정합성 보장 방식이 명확 | 대기와 데드락 가능성 | 같은 DB의 재고 경쟁이 잦은 경우 |
+| 분산 락 | 여러 시스템의 공유 자원 보호 가능 | 별도 Redis와 락 만료·해제 설계 필요 | DB 밖 자원까지 조율해야 하는 경우 |
 
 ---
 
-# 🔒 12. 동시성 제어
+## 9. API
 
-**담당: 이상민**
+![api.png](./img/api.png)
 
-여러 사용자가 동시에 같은 상품을 주문하거나 환불하는 상황에서 재고 정합성을 유지하기 위해 **비관적 락(Pessimistic Lock)**을 적용했습니다.
+### 핵심 API 요약
 
-## Pessimistic Write Lock
-
-```java
-@Lock(LockModeType.PESSIMISTIC_WRITE)
-@Query("select p from Product p where p.id = :productId")
-Optional<Product> findByIdWithLock(
-        @Param("productId") Long productId
-);
-```
-
-### 주문 시
-
-```text
-주문 요청
-   ↓
-상품 조회
-   ↓
-PESSIMISTIC_WRITE 락 획득
-   ↓
-재고 확인
-   ↓
-재고 차감
-   ↓
-OrderItem 생성
-```
-
-### 환불 시
-
-```text
-환불 요청
-   ↓
-상품 조회
-   ↓
-PESSIMISTIC_WRITE 락 획득
-   ↓
-환불 수량 확인
-   ↓
-재고 복구
-```
-
-주문과 환불에서 상품 재고를 변경하기 전에 동일한 비관적 락 전략을 사용하도록 구성했습니다.
+| 도메인 | Method | URL | 설명 | 인증 |
+| --- | --- | --- | --- | --- |
+| Member | POST | `/api/members/signup` | 회원가입 | 불필요 |
+| Member | POST | `/api/members/login` | 로그인 | 불필요 |
+| Member | GET | `/api/members/me` | 내 정보 조회 | 필요 |
+| Product | GET | `/api/products` | 기본 상품 목록 조회 | 필요 |
+| Product | GET | `/api/v2/products` | 캐시 상품 목록 조회 | 필요 |
+| Product | GET | `/api/products/{productId}` | 상품 상세 조회 | 필요 |
+| Product | PATCH | `/api/products/{productId}` | 상품 부분 수정 | 필요 |
+| Cart | POST | `/api/carts/items` | 장바구니 상품 추가 | 필요 |
+| Cart | GET | `/api/carts` | 장바구니 조회 | 필요 |
+| Cart | PATCH | `/api/carts/items/{cartItemId}` | 수량 변경 | 필요 |
+| Cart | DELETE | `/api/carts/items/{cartItemId}` | 상품 개별 삭제 | 필요 |
+| Cart | DELETE | `/api/carts` | 장바구니 전체 비우기 | 필요 |
+| Order | POST | `/api/orders` | 주문 생성 | 필요 |
+| Order | GET | `/api/orders` | 주문 목록 조회 | 필요 |
+| Order | GET | `/api/orders/{orderId}` | 주문 상세 조회 | 필요 |
+| Order | PATCH | `/api/orders/{orderId}/cancel` | 주문 취소 | 필요 |
+| Payment | POST | `/api/payments/confirm` | 모의 결제 승인 | 필요 |
 
 ---
-
-# 🔄 주문 / 결제 통합 흐름
-
-각 담당 도메인은 독립적으로 구현하는 동시에 실제 서비스에서는 하나의 흐름으로 연결되도록 구성했습니다.
-
-```text
-회원 / 인증
-    ↓
-상품 조회
-    ↓
-장바구니
-    ↓
-주문 생성
-    ↓
-재고 차감
-    ↓
-결제 생성
-    ↓
-결제 승인
-    ↓
-주문 완료
-    ↓
-주문 상품 장바구니 삭제
-```
-
-취소 및 환불의 경우:
-
-```text
-주문 / 결제
-    ↓
-취소 또는 환불
-    ↓
-환불 처리
-    ↓
-재고 복구
-    ↓
-주문 / 결제 상태 변경
-```
-
----
-
-# 🧪 테스트 및 검증
-
-## 자동화 테스트
-
-다음 영역에 대한 테스트를 구성했습니다.
-
-```text
-PlusProjectTeam3ApplicationTests
-CartServiceTest
-ProductTest
-ProductRepositoryTest
-ProductCacheServiceTest
-ProductServiceTest
-```
-
-### 주요 테스트 영역
-
-* Product Entity
-* Product Service
-* Product Repository
-* QueryDSL 조회
-* Product Cache
-* Cart Service
-
----
-
-# 🔎 API 통합 검증
-
-주요 비즈니스 흐름은 API를 통해 별도로 통합 검증했습니다.
-
-### 주문
-
-* 정상 주문 생성
-* 선택 상품 주문
-* 재고 부족 처리
-* 재고 차감 롤백
-* 주문 당시 가격 저장
-* 주문 목록 조회
-* 주문 상세 조회
-* 다른 사용자의 주문 접근 차단
-
-### 결제
-
-* 결제 승인
-* 결제 금액 변조 검증
-* 주문 완료 상태 변경
-* 중복 결제 방지
-* 결제 성공 후 주문 상품 장바구니 삭제
-
-### 취소 / 환불
-
-* 주문 취소
-* 재고 복구
-* 결제 취소
-* 전체 환불
-* 부분 환불
-* 환불 수량 검증
-* 환불 금액 검증
-* 중복 취소 방지
-
----
-
-# 🌿 Git 협업
+## 10. GIT 협업
 
 Feature Branch 기반으로 작업하고 Pull Request를 통해 `develop` 브랜치에 병합하는 방식으로 협업했습니다.
 
@@ -767,9 +499,63 @@ main
 
 `main` 브랜치에는 Pull Request를 통해 병합할 수 있도록 브랜치 보호 규칙을 적용하고, 코드 변경 사항을 PR 단위로 검토했습니다.
 
+## 11. 실행 방법
+
+### 사전 준비
+
+- Java와 Gradle 실행 환경
+- MySQL
+- Node.js
+- pnpm
+
+### Database
+
+개발용 DB와 테스트용 DB를 준비합니다.
+
+```sql
+CREATE DATABASE plus_project_team3;
+```
+
+환경변수에 MySQL 비밀번호를 설정합니다.
+
+```bash
+export MYSQL_PASSWORD="your_password"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:MYSQL_PASSWORD="your_password"
+```
+
+### Backend 실행
+
+```bash
+./gradlew bootRun
+```
+
+테스트:
+
+```bash
+./gradlew test
+```
+
+### Frontend 실행
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+production build:
+
+```bash
+pnpm build
+```
 ---
 
-# 📊 프로젝트 정리
+## 12. 프로젝트 정리
 
 | 담당자     | 담당 도메인    | CH5 프로젝트     | 핵심 내용                                      |
 | ------- | --------- | ------------ | ------------------------------------------ |
@@ -780,7 +566,7 @@ main
 
 ---
 
-# 💡 프로젝트를 통해 배운 점
+## 프로젝트를 통해 배운 점
 
 이번 프로젝트에서는 각자 담당 도메인을 구현하는 것뿐만 아니라, 서로 다른 도메인이 연결되는 과정에서 발생하는 문제까지 함께 경험했습니다.
 
@@ -806,40 +592,7 @@ QueryDSL과 Index를 적용하면서 단순히 기능을 구현하는 것을 넘
 
 ---
 
-# 🚀 실행 방법
-
-## 1. Clone
-
-```bash
-git clone https://github.com/kyungsik1995-afk/plus-project-team3.git
-cd plus-project-team3
-```
-
-## 2. Database 생성
-
-```sql
-CREATE DATABASE plus_project_team3;
-CREATE DATABASE plus_project_team3_test;
-```
-
-## 3. 환경 변수 설정
-
-```text
-MYSQL_PASSWORD=MySQL 비밀번호
-JWT_SECRET=JWT Secret Key
-```
-
-## 4. 프로젝트 실행
-
-```bash
-./gradlew bootRun
-```
-
-또는 IntelliJ에서 Spring Boot Application을 실행합니다.
-
----
-
-# 📌 프로젝트 핵심 요약
+## 📌 프로젝트 핵심 요약
 
 ```text
                 Plus Project Team 3
