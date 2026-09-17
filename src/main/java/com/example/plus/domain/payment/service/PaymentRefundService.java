@@ -1,0 +1,222 @@
+package com.example.plus.domain.payment.service;
+
+import com.example.plus.domain.payment.entity.*;
+import com.example.plus.domain.product.service.ProductService;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
+import com.example.plus.domain.payment.dto.RefundItemRequest;
+import com.example.plus.domain.payment.dto.RefundRequest;
+import com.example.plus.domain.payment.dto.RefundResponse;
+import com.example.plus.domain.payment.repository.PaymentRepository;
+import com.example.plus.domain.payment.repository.RefundItemRepository;
+import com.example.plus.domain.payment.repository.RefundRepository;
+import com.example.plus.domain.order.entity.Order;
+import com.example.plus.domain.order.entity.OrderItem;
+import com.example.plus.domain.order.repository.OrderItemRepository;
+import com.example.plus.domain.product.entity.Product;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class PaymentRefundService {
+
+    private final PaymentRepository paymentRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final RefundRepository refundRepository;
+    private final RefundItemRepository refundItemRepository;
+    private final ProductService productService;
+
+    @Transactional
+    public RefundResponse refund(Long paymentId, Long customerId, RefundRequest request) {
+        Payment payment = paymentRepository.findByIdAndMemberId(paymentId, customerId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
+        validatePaymentStatus(payment);
+
+        Order order = payment.getOrder();
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+
+        if (request == null || request.items() == null || request.items().isEmpty()) {
+            return refundAll(payment, order, orderItems, request == null ? null : request.reason());
+        }
+
+        return partialRefund(payment, order, orderItems, request);
+    }
+
+    private void validatePaymentStatus(Payment payment) {
+        if (payment.getStatus() != PaymentStatus.PAID
+                && payment.getStatus() != PaymentStatus.PART_CANCELLED) {
+            throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);
+        }
+    }
+
+    private RefundResponse refundAll(
+            Payment payment,
+            Order order,
+            List<OrderItem> orderItems,
+            String reason
+    ) {
+        // 이미 성공 처리된 환불 금액을 조회한다.
+        long alreadyRefunded = refundRepository.sumRefundAmount(payment.getId(), RefundStatus.SUCCEED);
+        long refundAmount = payment.getFinalPrice() - alreadyRefunded;
+
+        if (refundAmount <= 0) {
+            throw new BusinessException(ErrorCode.ALREADY_PROCESSED_REFUND);
+        }
+
+        Refund refund = new Refund(
+                payment,
+                refundAmount,
+                reason,
+                LocalDateTime.now()
+        );
+        refundRepository.save(refund);
+
+        for (OrderItem orderItem : orderItems) {
+            int refundedQuantity = refundItemRepository.sumRefundedQuantity(orderItem.getId()).intValue();
+            int remainingQuantity = orderItem.getQuantity() - refundedQuantity;
+
+            if (remainingQuantity <= 0) {
+                continue;
+            }
+
+            long itemRefundAmount = orderItem.getOrderPrice() * remainingQuantity;
+            refundItemRepository.save(new RefundItem(
+                    refund,
+                    orderItem,
+                    remainingQuantity,
+                    itemRefundAmount
+            ));
+
+            //비관적 락 적용 전 코드
+//            Product product = orderItem.getProduct();
+
+            //product에 비관적 락 적용
+            Product product = productService.findByIdWithLock(
+                    orderItem.getProduct().getId()
+            );
+
+            product.restoreStock(remainingQuantity);
+        }
+
+        payment.markAsCancelled();
+        order.cancel();
+
+        return new RefundResponse(
+                payment.getId(),
+                order.getId(),
+                order.getStatus().name(),
+                payment.getStatus().name(),
+                refundAmount,
+                refund.getStatus().name(),
+                "결제 취소 및 환불이 완료되었습니다."
+        );
+    }
+
+    private RefundResponse partialRefund(
+            Payment payment,
+            Order order,
+            List<OrderItem> orderItems,
+            RefundRequest request
+    ) {
+        Map<Long, OrderItem> orderItemMap = orderItems.stream()
+                .collect(Collectors.toMap(OrderItem::getId, Function.identity()));
+
+        Set<Long> requestedItemIds = new HashSet<>();
+        long totalRefundAmount = 0L;
+
+        for (RefundItemRequest itemRequest : request.items()) {
+            if (itemRequest == null || itemRequest.orderItemId() == null) {
+                throw new BusinessException(ErrorCode.INVALID_REFUND_ITEM);
+            }
+            if (itemRequest.quantity() == null || itemRequest.quantity() <= 0) {
+                throw new BusinessException(ErrorCode.INVALID_REFUND_QUANTITY);
+            }
+            if (!requestedItemIds.add(itemRequest.orderItemId())) {
+                throw new BusinessException(ErrorCode.INVALID_REFUND_ITEM);
+            }
+
+            OrderItem orderItem = orderItemMap.get(itemRequest.orderItemId());
+            if (orderItem == null) {
+                throw new BusinessException(ErrorCode.INVALID_REFUND_ITEM);
+            }
+
+            int alreadyRefunded = refundItemRepository.sumRefundedQuantity(orderItem.getId()).intValue();
+            int remainingQuantity = orderItem.getQuantity() - alreadyRefunded;
+
+            if (itemRequest.quantity() > remainingQuantity) {
+                throw new BusinessException(ErrorCode.REFUND_QUANTITY_MISMATCH);
+            }
+
+            totalRefundAmount += orderItem.getOrderPrice() * itemRequest.quantity();
+        }
+
+        // 기존에 성공 처리된 환불 금액을 조회한다.
+        long alreadyRefundedAmount = refundRepository.sumRefundAmount(payment.getId(), RefundStatus.SUCCEED);
+        if (alreadyRefundedAmount + totalRefundAmount > payment.getFinalPrice()) {
+            throw new BusinessException(ErrorCode.REFUND_AMOUNT_MISMATCH);
+        }
+
+        Refund refund = new Refund(
+                payment,
+                totalRefundAmount,
+                request.reason(),
+                LocalDateTime.now()
+        );
+        refundRepository.save(refund);
+
+        for (RefundItemRequest itemRequest : request.items()) {
+            OrderItem orderItem = orderItemMap.get(itemRequest.orderItemId());
+            long itemRefundAmount = orderItem.getOrderPrice() * itemRequest.quantity();
+
+            refundItemRepository.save(new RefundItem(
+                    refund,
+                    orderItem,
+                    itemRequest.quantity(),
+                    itemRefundAmount
+            ));
+
+            //비관적 락 적용 전 코드
+//            orderItem.getProduct().restoreStock(itemRequest.quantity());
+
+            //비관적 락 적용
+            Product product = productService.findByIdWithLock(
+                    orderItem.getProduct().getId()
+            );
+
+            product.restoreStock(itemRequest.quantity());
+        }
+
+        long totalRefunded = alreadyRefundedAmount + totalRefundAmount;
+        boolean fullyRefunded = totalRefunded >= payment.getFinalPrice();
+
+        if (fullyRefunded) {
+            payment.markAsCancelled();
+            order.cancel();
+        } else {
+            payment.markAsPartCancelled();
+        }
+
+        return new RefundResponse(
+                payment.getId(),
+                order.getId(),
+                order.getStatus().name(),
+                payment.getStatus().name(),
+                totalRefundAmount,
+                refund.getStatus().name(),
+                fullyRefunded
+                        ? "결제 취소 및 환불이 완료되었습니다."
+                        : "부분 결제 취소 및 환불이 완료되었습니다."
+        );
+    }
+}
