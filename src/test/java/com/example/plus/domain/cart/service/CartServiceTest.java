@@ -1,0 +1,674 @@
+package com.example.plus.domain.cart.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import com.example.plus.domain.cart.dto.CartAddRequest;
+import com.example.plus.domain.cart.dto.CartItemResponse;
+import com.example.plus.domain.cart.dto.CartItemUpdateRequest;
+import com.example.plus.domain.cart.dto.CartResponse;
+import com.example.plus.domain.cart.entity.Cart;
+import com.example.plus.domain.cart.entity.CartItem;
+import com.example.plus.domain.cart.repository.CartItemRepository;
+import com.example.plus.domain.cart.repository.CartRepository;
+import com.example.plus.domain.member.entity.Member;
+import com.example.plus.domain.member.repository.MemberRepository;
+import com.example.plus.domain.product.entity.Product;
+import com.example.plus.domain.product.repository.ProductRepository;
+import com.example.plus.global.exception.ErrorCode;
+import com.example.plus.global.exception.business.BusinessException;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@ExtendWith(MockitoExtension.class)
+class CartServiceTest {
+
+    private static final Long MEMBER_ID = 1L;
+    private static final Long PRODUCT_ID = 10L;
+
+    @Mock
+    private CartRepository cartRepository;
+
+    @Mock
+    private CartItemRepository cartItemRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private MemberRepository memberRepository;
+
+    @InjectMocks
+    private CartService cartService;
+
+    @Test
+    void getCartReturnsEmptyResponseWhenCartDoesNotExist() {
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(List.of(), response.items());
+        assertEquals(0L, response.totalPrice());
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void getCartReturnsEmptyResponseWhenCartHasNoItems() {
+        Cart cart = cartForMember(MEMBER_ID);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of());
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(List.of(), response.items());
+        assertEquals(0L, response.totalPrice());
+    }
+
+    @Test
+    void getCartCalculatesSingleItemTotalPrice() {
+        Cart cart = cartForMember(MEMBER_ID);
+        CartItem cartItem = cartItemForResponse(100L, PRODUCT_ID, "상품 A", 10_000L, 3);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of(cartItem));
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(30_000L, response.items().get(0).itemTotalPrice());
+        assertEquals(30_000L, response.totalPrice());
+    }
+
+    @Test
+    void getCartSumsMultipleItemTotalPrices() {
+        Cart cart = cartForMember(MEMBER_ID);
+        CartItem firstItem = cartItemForResponse(100L, 10L, "상품 A", 10_000L, 2);
+        CartItem secondItem = cartItemForResponse(200L, 20L, "상품 B", 30_000L, 3);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartWithProduct(cart))
+                .thenReturn(List.of(firstItem, secondItem));
+
+        CartResponse response = cartService.getCart(MEMBER_ID);
+
+        assertEquals(2, response.items().size());
+        assertEquals(110_000L, response.totalPrice());
+    }
+
+    @Test
+    void getCartIncludesCartItemAndProductInformation() {
+        Cart cart = cartForMember(MEMBER_ID);
+        CartItem cartItem = cartItemForResponse(
+                100L,
+                PRODUCT_ID,
+                "테스트 상품",
+                10_000L,
+                3
+        );
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(List.of(cartItem));
+
+        CartItemResponse itemResponse = cartService.getCart(MEMBER_ID).items().get(0);
+
+        assertEquals(100L, itemResponse.cartItemId());
+        assertEquals(PRODUCT_ID, itemResponse.productId());
+        assertEquals("테스트 상품", itemResponse.productName());
+        assertEquals(10_000L, itemResponse.productPrice());
+        assertEquals(3, itemResponse.quantity());
+        verify(cartItemRepository).findAllByCartWithProduct(cart);
+    }
+
+    @Test
+    void getCartItemsReturnsItemsFromMembersCartUsingProductFetchQuery() {
+        Cart cart = cartForMember(MEMBER_ID);
+        CartItem cartItem = CartItem.create(
+                cart,
+                org.mockito.Mockito.mock(Product.class),
+                2
+        );
+        List<CartItem> cartItems = List.of(cartItem);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartWithProduct(cart)).thenReturn(cartItems);
+
+        List<CartItem> result = cartService.getCartItems(MEMBER_ID);
+
+        assertEquals(cartItems, result);
+        verify(cartRepository).findByMember_Id(MEMBER_ID);
+        verify(cartItemRepository).findAllByCartWithProduct(cart);
+    }
+
+    @Test
+    void getCartItemsRejectsMissingCart() {
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.getCartItems(MEMBER_ID)
+        );
+
+        assertEquals(ErrorCode.CART_NOT_FOUND, exception.getErrorCode());
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void getCartItemsQueriesOnlyAuthenticatedMembersCart() {
+        Cart membersCart = cartForMember(MEMBER_ID);
+        Cart anotherMembersCart = cartForMember(2L);
+        CartItem membersItem = CartItem.create(
+                membersCart,
+                org.mockito.Mockito.mock(Product.class),
+                1
+        );
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(membersCart));
+        when(cartItemRepository.findAllByCartWithProduct(membersCart))
+                .thenReturn(List.of(membersItem));
+
+        List<CartItem> result = cartService.getCartItems(MEMBER_ID);
+
+        assertEquals(List.of(membersItem), result);
+        verify(cartItemRepository).findAllByCartWithProduct(membersCart);
+        verify(cartItemRepository, never()).findAllByCartWithProduct(anotherMembersCart);
+    }
+
+    @Test
+    void clearCartDeletesAllItemsWhenMultipleItemsExist() {
+        Cart cart = cartForMember(MEMBER_ID);
+        CartItem firstItem = CartItem.create(
+                cart,
+                org.mockito.Mockito.mock(Product.class),
+                2
+        );
+        CartItem secondItem = CartItem.create(
+                cart,
+                org.mockito.Mockito.mock(Product.class),
+                3
+        );
+        List<CartItem> cartItems = List.of(firstItem, secondItem);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(cartItems);
+
+        cartService.clearCart(MEMBER_ID);
+
+        verify(cartItemRepository).deleteAll(cartItems);
+    }
+
+    @Test
+    void clearCartCompletesWhenCartHasNoItems() {
+        Cart cart = cartForMember(MEMBER_ID);
+        List<CartItem> emptyItems = List.of();
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(emptyItems);
+
+        cartService.clearCart(MEMBER_ID);
+
+        verify(cartItemRepository).deleteAll(emptyItems);
+    }
+
+    @Test
+    void clearCartCompletesWhenCartDoesNotExist() {
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+
+        cartService.clearCart(MEMBER_ID);
+
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void clearCartDoesNotDeleteCartEntity() {
+        Cart cart = cartForMember(MEMBER_ID);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(List.of());
+
+        cartService.clearCart(MEMBER_ID);
+
+        verify(cartRepository, never()).delete(any(Cart.class));
+    }
+
+    @Test
+    void clearCartDoesNotChangeProductStock() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+        List<CartItem> cartItems = List.of(cartItem);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCart(cart)).thenReturn(cartItems);
+
+        cartService.clearCart(MEMBER_ID);
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void deleteItemDeletesOwnedCartItem() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.deleteItem(MEMBER_ID, 100L);
+
+        verify(cartItemRepository).delete(cartItem);
+    }
+
+    @Test
+    void deleteItemRejectsMissingCartItem() {
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.deleteItem(MEMBER_ID, 100L)
+        );
+
+        assertEquals(ErrorCode.CART_ITEM_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void deleteItemRejectsAnotherMembersItem() {
+        Cart anotherMembersCart = cartForMember(2L);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.deleteItem(MEMBER_ID, 100L)
+        );
+
+        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+    }
+
+    @Test
+    void deleteItemDoesNotDeleteAnotherMembersItem() {
+        Cart anotherMembersCart = cartForMember(2L);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        assertThrows(
+                BusinessException.class,
+                () -> cartService.deleteItem(MEMBER_ID, 100L)
+        );
+
+        verify(cartItemRepository, never()).delete(any(CartItem.class));
+    }
+
+    @Test
+    void deleteItemDoesNotChangeProductStock() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.deleteItem(MEMBER_ID, 100L);
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void updateItemQuantityChangesToRequestedFinalQuantity() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        CartItemResponse response = cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(5)
+        );
+
+        assertEquals(5, cartItem.getQuantity());
+        assertEquals(5, response.quantity());
+        assertEquals(5_000L, response.itemTotalPrice());
+        verify(cartItemRepository, never()).save(any(CartItem.class));
+    }
+
+    @Test
+    void updateItemQuantityDoesNotAddRequestedQuantity() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(5)
+        );
+
+        assertEquals(5, cartItem.getQuantity());
+    }
+
+    @Test
+    void updateItemQuantityAllowsQuantityEqualToStock() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        CartItemResponse response = cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(10)
+        );
+
+        assertEquals(10, cartItem.getQuantity());
+        assertEquals(10, response.quantity());
+    }
+
+    @Test
+    void updateItemQuantityRejectsQuantityOverStockWithoutChangingItem() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.updateItemQuantity(
+                        MEMBER_ID,
+                        100L,
+                        new CartItemUpdateRequest(11)
+                )
+        );
+
+        assertEquals(ErrorCode.OUT_OF_STOCK, exception.getErrorCode());
+        assertEquals(3, cartItem.getQuantity());
+    }
+
+    @Test
+    void updateItemQuantityRejectsMissingCartItem() {
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.updateItemQuantity(
+                        MEMBER_ID,
+                        100L,
+                        new CartItemUpdateRequest(5)
+                )
+        );
+
+        assertEquals(ErrorCode.CART_ITEM_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void updateItemQuantityRejectsAnotherMembersItemWithoutChangingQuantity() {
+        Cart anotherMembersCart = cartForMember(2L);
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartItem cartItem = CartItem.create(anotherMembersCart, product, 3);
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.updateItemQuantity(
+                        MEMBER_ID,
+                        100L,
+                        new CartItemUpdateRequest(5)
+                )
+        );
+
+        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+        assertEquals(3, cartItem.getQuantity());
+    }
+
+    @Test
+    void updateItemQuantityDoesNotChangeProductStock() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem cartItem = CartItem.create(cart, product, 3);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartItemRepository.findById(100L)).thenReturn(Optional.of(cartItem));
+
+        cartService.updateItemQuantity(
+                MEMBER_ID,
+                100L,
+                new CartItemUpdateRequest(5)
+        );
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void addItemCreatesCartAndNewCartItem() {
+        Member member = memberWithId(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartAddRequest request = new CartAddRequest(PRODUCT_ID, 3);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartItemRepository.findByCartAndProduct(any(Cart.class), any(Product.class)))
+                .thenReturn(Optional.empty());
+        when(cartItemRepository.save(any(CartItem.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CartItemResponse response = cartService.addItem(MEMBER_ID, request);
+
+        assertEquals(PRODUCT_ID, response.productId());
+        assertEquals(3, response.quantity());
+        assertEquals(3_000L, response.itemTotalPrice());
+        verify(memberRepository).findById(MEMBER_ID);
+        verify(cartRepository).save(any(Cart.class));
+        verify(cartItemRepository).save(any(CartItem.class));
+    }
+
+    @Test
+    void addItemRejectsMissingMemberWithoutSavingCartOrCartItem() {
+        Product product = org.mockito.Mockito.mock(Product.class);
+        CartAddRequest request = new CartAddRequest(PRODUCT_ID, 3);
+
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.empty());
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(MEMBER_ID, request)
+        );
+
+        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
+        verify(cartRepository, never()).save(any(Cart.class));
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void addItemAddsQuantityWithoutCreatingAnotherRow() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productForSuccess(10);
+        CartItem existingItem = CartItem.create(cart, product, 3);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartItemRepository.findByCartAndProduct(cart, product))
+                .thenReturn(Optional.of(existingItem));
+
+        CartItemResponse response = cartService.addItem(
+                MEMBER_ID,
+                new CartAddRequest(PRODUCT_ID, 2)
+        );
+
+        assertEquals(5, existingItem.getQuantity());
+        assertEquals(5, response.quantity());
+        verify(cartItemRepository, never()).save(any(CartItem.class));
+    }
+
+    @Test
+    void addItemRejectsFirstQuantityOverStock() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productWithStock(10);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartItemRepository.findByCartAndProduct(cart, product)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(
+                        MEMBER_ID,
+                        new CartAddRequest(PRODUCT_ID, 11)
+                )
+        );
+
+        assertEquals(ErrorCode.OUT_OF_STOCK, exception.getErrorCode());
+        verify(cartItemRepository, never()).save(any(CartItem.class));
+    }
+
+    @Test
+    void addItemRejectsCombinedQuantityOverStockWithoutChangingExistingItem() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productWithStock(10);
+        CartItem existingItem = CartItem.create(cart, product, 7);
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartItemRepository.findByCartAndProduct(cart, product))
+                .thenReturn(Optional.of(existingItem));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(
+                        MEMBER_ID,
+                        new CartAddRequest(PRODUCT_ID, 4)
+                )
+        );
+
+        assertEquals(ErrorCode.OUT_OF_STOCK, exception.getErrorCode());
+        assertEquals(7, existingItem.getQuantity());
+        verify(cartItemRepository, never()).save(any(CartItem.class));
+    }
+
+    @Test
+    void addItemRejectsMissingProduct() {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(
+                        MEMBER_ID,
+                        new CartAddRequest(PRODUCT_ID, 1)
+                )
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verifyNoInteractions(cartItemRepository);
+    }
+
+    @Test
+    void addItemDoesNotCreateCartWhenCartAndProductDoNotExist() {
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cartService.addItem(
+                        MEMBER_ID,
+                        new CartAddRequest(PRODUCT_ID, 1)
+                )
+        );
+
+        assertEquals(ErrorCode.PRODUCT_NOT_FOUND, exception.getErrorCode());
+        verify(cartRepository, never()).findByMember_Id(MEMBER_ID);
+        verify(memberRepository, never()).findById(MEMBER_ID);
+        verify(cartRepository, never()).save(any(Cart.class));
+    }
+
+    @Test
+    void addItemDoesNotDecreaseProductStock() {
+        Cart cart = cartForMember(MEMBER_ID);
+        Product product = productForSuccess(10);
+        int stockBefore = product.getStockQuantity();
+
+        when(cartRepository.findByMember_Id(MEMBER_ID)).thenReturn(Optional.of(cart));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(cartItemRepository.findByCartAndProduct(cart, product)).thenReturn(Optional.empty());
+        when(cartItemRepository.save(any(CartItem.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        cartService.addItem(MEMBER_ID, new CartAddRequest(PRODUCT_ID, 3));
+
+        assertEquals(stockBefore, product.getStockQuantity());
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    private Cart cartForMember(Long memberId) {
+        return Cart.create(memberWithId(memberId));
+    }
+
+    private Member memberWithId(Long memberId) {
+        Member member = new Member(
+                "member-" + memberId + "@example.com",
+                "password",
+                "회원",
+                "010-0000-0000"
+        );
+        ReflectionTestUtils.setField(member, "id", memberId);
+        return member;
+    }
+
+    private Product productForSuccess(Integer stockQuantity) {
+        Product product = productWithStock(stockQuantity);
+        when(product.getId()).thenReturn(PRODUCT_ID);
+        when(product.getName()).thenReturn("테스트 상품");
+        when(product.getPrice()).thenReturn(1_000L);
+        return product;
+    }
+
+    private Product productWithStock(Integer stockQuantity) {
+        Product product = org.mockito.Mockito.mock(Product.class);
+        when(product.getStockQuantity()).thenReturn(stockQuantity);
+        return product;
+    }
+
+    private CartItem cartItemForResponse(
+            Long cartItemId,
+            Long productId,
+            String productName,
+            Long productPrice,
+            Integer quantity
+    ) {
+        Product product = org.mockito.Mockito.mock(Product.class);
+        when(product.getId()).thenReturn(productId);
+        when(product.getName()).thenReturn(productName);
+        when(product.getPrice()).thenReturn(productPrice);
+
+        CartItem cartItem = org.mockito.Mockito.mock(CartItem.class);
+        when(cartItem.getId()).thenReturn(cartItemId);
+        when(cartItem.getProduct()).thenReturn(product);
+        when(cartItem.getQuantity()).thenReturn(quantity);
+        return cartItem;
+    }
+}
