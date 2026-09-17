@@ -78,7 +78,7 @@ public class OrderFacade {
 //                    Product product = cartItem.getProduct();
 //
 
-                    //장바구니에 들어있는 상품에 비관적 락을 적용
+                    // 장바구니에 들어있는 상품에 비관적 락을 적용
                     Product product = productService.findByIdWithLock(
                             cartItem.getProduct().getId()
                     );
@@ -87,9 +87,6 @@ public class OrderFacade {
                     // @Transactional에 의해 지금까지의 변경도 함께 롤백된다.
                     product.decreaseStock(cartItem.getQuantity());
 
-
-
-                    product.decreaseStock(cartItem.getQuantity());
 
                     // 주문 당시 상품명과 가격을 스냅샷으로 저장한다.
                     return new OrderItem(
